@@ -1,5 +1,5 @@
 /* 調査位置立会ビューア — オフライン用 Service Worker */
-const APP   = 'bview-app-v1';
+const APP   = 'bview-app-v2';
 const TILES = 'bview-tiles-v1';
 const SHELL = ['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 const TILE_HOST = /(^|\.)(cyberjapandata\.gsi\.go\.jp|tile\.openstreetmap\.org)$/;
@@ -40,17 +40,17 @@ self.addEventListener('fetch', e=>{
     return;
   }
 
-  /* アプリ本体：キャッシュ優先、無ければ取得して保存 */
+  /* アプリ本体：通信優先（更新を必ず拾う）、圏外ならキャッシュ */
   if(u.origin===self.location.origin){
     e.respondWith((async()=>{
       const c = await caches.open(APP);
-      const hit = await c.match(req,{ignoreSearch:true});
-      if(hit) return hit;
       try{
         const res = await fetch(req);
         if(res && res.status===200){ try{ await c.put(req,res.clone()); }catch(_){} }
         return res;
       }catch(_){
+        const hit = await c.match(req,{ignoreSearch:true});
+        if(hit) return hit;
         const idx = await c.match('./index.html');
         return idx || new Response('', {status:504});
       }
