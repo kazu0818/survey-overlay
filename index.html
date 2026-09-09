@@ -754,6 +754,28 @@ body.adjust #capture{background:rgba(31,111,208,.04)}
 
 .pin{width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
 .pin.a{background:#dc2626}.pin.b{background:#2563eb}.pin.gps{background:#059669}
+/* 写真番号マーカー */
+.pm{position:relative;width:52px;height:52px}
+.pm-rot{position:absolute;inset:0;transform-origin:50% 50%}
+.pm-arw{position:absolute;left:50%;top:1px;width:0;height:0;margin-left:-7px;
+  border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:13px solid #c0392b;
+  filter:drop-shadow(0 0 1.5px rgba(255,255,255,.95))}
+.pm-arw:after{content:"";position:absolute;left:-2.5px;top:13px;width:5px;height:11px;background:#c0392b;
+  box-shadow:0 0 0 1px rgba(255,255,255,.7)}
+.pm-num{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  min-width:24px;height:24px;padding:0 6px;border-radius:12px;background:#c0392b;color:#fff;
+  font:700 12px/24px -apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;
+  text-align:center;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.pm.sel .pm-num{background:#1f6fd0}
+.pm.sel .pm-arw{border-bottom-color:#1f6fd0}
+.pm.sel .pm-arw:after{background:#1f6fd0}
+body.photomode #capture{background:rgba(192,57,43,.05);cursor:crosshair}
+.pedit{display:flex;flex-direction:column;gap:7px;min-width:190px}
+.pedit .r{display:flex;align-items:center;gap:7px}
+.pedit label{font-size:11px;color:#5b6a80;min-width:44px}
+.pedit input{font:inherit;font-size:13px;padding:6px;border:1px solid #d8dee9;border-radius:7px;width:100%}
+.pedit button{font-size:12px;padding:7px 10px;min-height:0}
+
 .gpsdot{position:relative;width:16px;height:16px;border-radius:50%;background:#0a7d55;
   border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
 .gpsdot:after{content:"";position:absolute;left:50%;top:50%;width:14px;height:14px;
@@ -788,6 +810,7 @@ body.adjust #capture{background:rgba(31,111,208,.04)}
   <div id="modes">
     <button id="mMap" class="on">地図操作</button>
     <button id="mAdj">図面調整</button>
+    <button id="mPhoto">写真番号</button>
   </div>
   <button id="btnToggleImg" title="図面の表示/非表示">図面 ON</button>
   <button id="btnMenu" class="primary">☰ メニュー</button>
@@ -848,6 +871,23 @@ body.adjust #capture{background:rgba(31,111,208,.04)}
     <div class="chk"><input type="checkbox" id="chkWhite" checked><label for="chkWhite" style="min-width:0">白い背景を透明にする</label></div>
     <div class="row"><label>しきい値</label><input type="range" id="thr" min="120" max="255" value="225"><span class="val" id="thrVal">225</span></div>
     <div class="chk"><input type="checkbox" id="chkBoost"><label for="chkBoost" style="min-width:0">線を濃く（コントラスト強調）</label></div>
+  </div>
+
+  <div class="sec">
+    <h3>写真番号</h3>
+    <div class="chk"><input type="checkbox" id="chkPhotos" checked><label for="chkPhotos" style="min-width:0">写真番号を表示する</label></div>
+    <div class="row"><label>次の番号</label><input type="number" id="nextNo" min="1" value="1" style="width:80px"></div>
+    <div class="grid2">
+      <button id="btnPhotoHere">現在地に打つ</button>
+      <button id="btnPhotoClear">すべて削除</button>
+    </div>
+    <p class="hint">「写真番号」モードにして地図をタップすると番号が付きます。<b>押したまま撮影した方向へ指を動かすと、その向きに矢印が付きます。</b>打った番号をタップすると、番号・方向・メモを直せます。</p>
+    <div id="photoList"></div>
+    <div class="grid2" style="margin-top:8px">
+      <button id="btnPhotoCsv">CSVで書き出す</button>
+      <button id="btnPhotoGeo">GeoJSONで書き出す</button>
+    </div>
+    <p class="hint">CSVは写真整理用（番号・緯度経度・方位角・メモ）、GeoJSONはQGISでそのまま開けます。</p>
   </div>
 
   <div class="sec">
@@ -1063,11 +1103,14 @@ function setMode(m){
   mode=m;
   $('#mMap').classList.toggle('on',m==='map');
   $('#mAdj').classList.toggle('on',m==='adjust');
+  $('#mPhoto').classList.toggle('on',m==='photo');
   document.body.classList.toggle('adjust',m==='adjust');
-  $('#capture').classList.toggle('on', m==='adjust'||m==='pick');
+  document.body.classList.toggle('photomode',m==='photo');
+  $('#capture').classList.toggle('on', m==='adjust'||m==='pick'||m==='photo');
 }
 $('#mMap').onclick=()=>{ cancelPick(); setMode('map'); };
 $('#mAdj').onclick=()=>{ if(!ST){toast('先に図面を読み込んでください');return;} cancelPick(); setMode('adjust'); };
+$('#mPhoto').onclick=()=>{ cancelPick(); setMode('photo'); toast('地図をタップで番号を配置。押したまま撮影方向へ動かすと矢印が付きます'); };
 
 /* ============ タッチ操作（図面調整） ============ */
 const cap=$('#capture');
@@ -1083,17 +1126,20 @@ cap.addEventListener('pointerdown',e=>{
   cap.setPointerCapture(e.pointerId);
   pts.set(e.pointerId, ptFromEvent(e));
   if(mode==='pick'){ return; }
+  if(mode==='photo'){ photoDown(ptFromEvent(e)); return; }
   startGesture();
 });
 cap.addEventListener('pointermove',e=>{
   if(!pts.has(e.pointerId)) return;
   pts.set(e.pointerId, ptFromEvent(e));
+  if(mode==='photo'){ photoMove(ptFromEvent(e)); return; }
   if(mode==='adjust' && g) applyGesture();
 });
 function endPointer(e){
   if(mode==='pick' && pts.has(e.pointerId)){
     const p=pts.get(e.pointerId); pts.delete(e.pointerId); handlePick(p); return;
   }
+  if(mode==='photo'){ pts.delete(e.pointerId); photoUp(); return; }
   pts.delete(e.pointerId);
   if(pts.size===0) g=null; else startGesture();
 }
@@ -1236,6 +1282,141 @@ $('#btnFull').onclick=()=>{
   else if(el.requestFullscreen) el.requestFullscreen();
   else toast('この端末では全画面に対応していません');
 };
+/* ===== 写真番号（番号＋撮影方向の矢印） ===== */
+let photos=[];               // {id,n,lat,lng,dir,memo}
+let photoMk={};              // id -> marker
+let photoSel=null;           // 編集中のid
+let drag=null;               // 配置ドラッグ中の状態
+const photoLayer=L.layerGroup().addTo(map);
+
+function photoIcon(p,sel){
+  const rot = (p.dir===null||p.dir===undefined)
+    ? '' : `<div class="pm-rot" style="transform:rotate(${p.dir}deg)"><div class="pm-arw"></div></div>`;
+  return L.divIcon({className:'', iconSize:[52,52], iconAnchor:[26,26],
+    html:`<div class="pm${sel?' sel':''}">${rot}<div class="pm-num">${p.n}</div></div>`});
+}
+function drawPhoto(p){
+  if(photoMk[p.id]) photoLayer.removeLayer(photoMk[p.id]);
+  const m=L.marker([p.lat,p.lng],{icon:photoIcon(p,photoSel===p.id),zIndexOffset:600}).addTo(photoLayer);
+  m.on('click',()=>openPhotoEditor(p.id));
+  photoMk[p.id]=m;
+}
+function redrawPhotos(){
+  photoLayer.clearLayers(); photoMk={};
+  photos.forEach(drawPhoto);
+  renderPhotoList();
+}
+function nextNo(){ const v=parseInt($('#nextNo').value,10); return isNaN(v)?photos.length+1:v; }
+function bumpNo(n){ $('#nextNo').value=n+1; }
+
+function addPhoto(lat,lng,dir){
+  const p={id:'p'+Date.now()+Math.random().toString(36).slice(2,5), n:nextNo(), lat, lng, dir:dir===undefined?null:dir, memo:''};
+  photos.push(p); bumpNo(p.n); drawPhoto(p); renderPhotoList();
+  return p;
+}
+/* 配置：押した位置に番号、そのままドラッグで撮影方向 */
+function photoDown(pt){
+  const ll=toLatLng(pt);
+  const near=photos.find(p=>{
+    const c=map.latLngToContainerPoint([p.lat,p.lng]);
+    const r=map.getContainer().getBoundingClientRect();
+    return Math.hypot(c.x-(pt.x-r.left), c.y-(pt.y-r.top))<26;
+  });
+  if(near){ drag=null; openPhotoEditor(near.id); return; }
+  drag={p:addPhoto(ll.lat,ll.lng), start:pt};
+}
+function photoMove(pt){
+  if(!drag) return;
+  const dx=pt.x-drag.start.x, dy=pt.y-drag.start.y;
+  if(Math.hypot(dx,dy)<12){ if(drag.p.dir!==null){ drag.p.dir=null; drawPhoto(drag.p); } return; }
+  let a=Math.atan2(dx,-dy)*180/Math.PI; if(a<0) a+=360;
+  drag.p.dir=Math.round(a); drawPhoto(drag.p);
+}
+function photoUp(){ if(drag){ renderPhotoList(); drag=null; } }
+
+$('#btnPhotoHere').onclick=()=>{
+  if(!navigator.geolocation){ toast('現在地を取得できません'); return; }
+  toast('測位中…');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const p=addPhoto(pos.coords.latitude,pos.coords.longitude,null);
+    map.setView([p.lat,p.lng], Math.max(map.getZoom(),17));
+    openPhotoEditor(p.id);
+    toast('No.'+p.n+' を現在地に置きました');
+  },()=>toast('現在地を取得できませんでした'),{enableHighAccuracy:true,timeout:15000});
+};
+$('#btnPhotoClear').onclick=()=>{
+  if(!photos.length) return;
+  photos=[]; photoSel=null; redrawPhotos(); $('#nextNo').value=1; toast('写真番号をすべて削除しました');
+};
+$('#chkPhotos').onchange=e=>{
+  if(e.target.checked) photoLayer.addTo(map); else map.removeLayer(photoLayer);
+};
+
+function openPhotoEditor(id){
+  const p=photos.find(x=>x.id===id); if(!p) return;
+  photoSel=id; redrawPhotos();
+  const box=document.createElement('div'); box.className='pedit';
+  box.innerHTML=`<div class="r"><label>番号</label><input type="text" id="peN" value="${p.n}"></div>
+    <div class="r"><label>方向</label><input type="number" id="peD" min="0" max="359" placeholder="なし" value="${p.dir===null?'':p.dir}"></div>
+    <div class="r"><label>メモ</label><input type="text" id="peM" value="${(p.memo||'').replace(/"/g,'&quot;')}"></div>`;
+  const row=document.createElement('div'); row.className='r'; row.style.marginTop='4px';
+  const ok=document.createElement('button'); ok.textContent='保存'; ok.className='primary'; ok.style.flex='1';
+  const del=document.createElement('button'); del.textContent='削除';
+  row.append(ok,del); box.appendChild(row);
+  const mk=photoMk[id];
+  mk.unbindPopup(); mk.bindPopup(box,{closeButton:true,minWidth:210}).openPopup();
+  ok.onclick=()=>{
+    p.n=box.querySelector('#peN').value.trim()||p.n;
+    const d=box.querySelector('#peD').value.trim();
+    p.dir = d===''? null : ((parseFloat(d)%360)+360)%360;
+    p.memo=box.querySelector('#peM').value;
+    photoSel=null; mk.closePopup(); redrawPhotos();
+  };
+  del.onclick=()=>{
+    photos=photos.filter(x=>x.id!==id); photoSel=null; mk.closePopup(); redrawPhotos();
+  };
+  mk.on('popupclose',()=>{ if(photoSel===id){ photoSel=null; redrawPhotos(); } });
+}
+
+function renderPhotoList(){
+  const box=$('#photoList'); box.innerHTML='';
+  if(!photos.length){ box.innerHTML='<p class="hint">まだありません。</p>'; return; }
+  photos.forEach(p=>{
+    const row=document.createElement('div'); row.className='saved';
+    const nm=document.createElement('span'); nm.className='nm';
+    nm.textContent=`No.${p.n}` + (p.dir===null?'':`  ${Math.round(p.dir)}°`) + (p.memo?`  ${p.memo}`:'');
+    const b1=document.createElement('button'); b1.textContent='表示';
+    b1.onclick=()=>{ map.setView([p.lat,p.lng],Math.max(map.getZoom(),17)); openPhotoEditor(p.id); closePanel(); };
+    row.append(nm,b1); box.appendChild(row);
+  });
+}
+function dl(name,text,type){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([text],{type:type||'text/plain'}));
+  a.download=name; document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000);
+}
+$('#btnPhotoCsv').onclick=()=>{
+  if(!photos.length){ toast('写真番号がありません'); return; }
+  const name=($('#siteInput').value||$('#siteName').textContent||'現場').trim();
+  const rows=[['写真番号','緯度','経度','方位角','メモ']].concat(
+    photos.map(p=>[p.n,p.lat.toFixed(8),p.lng.toFixed(8),p.dir===null?'':Math.round(p.dir),(p.memo||'').replace(/"/g,'""')]));
+  const csv='﻿'+rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\r\n');
+  dl(name.replace(/[\\/:*?"<>|]/g,'_')+'_写真番号.csv',csv,'text/csv');
+  toast('CSVを書き出しました');
+};
+$('#btnPhotoGeo').onclick=()=>{
+  if(!photos.length){ toast('写真番号がありません'); return; }
+  const name=($('#siteInput').value||$('#siteName').textContent||'現場').trim();
+  const gj={type:'FeatureCollection',name:name+'_写真番号',
+    crs:{type:'name',properties:{name:'urn:ogc:def:crs:OGC:1.3:CRS84'}},
+    features:photos.map(p=>({type:'Feature',
+      geometry:{type:'Point',coordinates:[+p.lng.toFixed(9),+p.lat.toFixed(9)]},
+      properties:{写真番号:String(p.n),方位角:p.dir===null?null:Math.round(p.dir),メモ:p.memo||''}}))};
+  dl(name.replace(/[\\/:*?"<>|]/g,'_')+'_写真番号.geojson',JSON.stringify(gj,null,1),'application/geo+json');
+  toast('GeoJSONを書き出しました');
+};
+
 /* ===== 現在地のリアルタイム表示 ===== */
 let gpsWatch=null, gpsMarker=null, gpsCircle=null;
 function stopGps(msg){
@@ -1326,6 +1507,7 @@ $('#btnSave').onclick=async()=>{
   const rec={id:'s'+Date.now(), name, blob, w:IMG.w, h:IMG.h, st:{...ST},
     base:$('#base').value, opacity:+$('#opacity').value,
     white:$('#chkWhite').checked, thr:+$('#thr').value, boost:$('#chkBoost').checked,
+    photos:JSON.parse(JSON.stringify(photos)), nextNo:+$('#nextNo').value,
     updated:Date.now()};
   tx('readwrite').put(rec);
   setTimeout(()=>{renderSites(); toast('保存しました');},200);
@@ -1351,6 +1533,9 @@ function applySite(rec,src,done){
     if(rec.base){ $('#base').value=rec.base; setBase(rec.base); }
     const op=(typeof rec.opacity==='number')?rec.opacity:70;
     $('#opacity').value=op; $('#opacityVal').textContent=op+'%';
+    photos = Array.isArray(rec.photos) ? JSON.parse(JSON.stringify(rec.photos)) : [];
+    photoSel=null; $('#nextNo').value = rec.nextNo || (photos.length+1);
+    redrawPhotos();
     ST={...rec.st};
     if(!map.hasLayer(overlay)) overlay.addTo(map);
     processImage();
@@ -1379,6 +1564,7 @@ $('#btnExport').onclick=()=>{
   const rec={v:1, app:'調査位置立会ビューア', name, planSrc:src,
     st:{...ST}, base:$('#base').value, opacity:+$('#opacity').value,
     white:$('#chkWhite').checked, thr:+$('#thr').value, boost:$('#chkBoost').checked,
+    photos:JSON.parse(JSON.stringify(photos)), nextNo:+$('#nextNo').value,
     updated:Date.now()};
   const blob=new Blob([JSON.stringify(rec)],{type:'application/json'});
   const a=document.createElement('a');
@@ -1403,6 +1589,7 @@ $('#fileSite').onchange=e=>{
 };
 
 openDB().then(renderSites);
+renderPhotoList();
 
 /* ============ オフライン地図（Service Worker） ============ */
 let sw=null;
