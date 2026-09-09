@@ -850,6 +850,16 @@ body.adjust #capture{background:rgba(31,111,208,.04)}
     <p class="hint">図面・位置合わせ・地図の種類をこの端末に保存します。次回は一覧から開くだけで立会を始められます。</p>
   </div>
 
+  <div class="sec">
+    <h3>現場ファイルの受け渡し</h3>
+    <div class="grid2">
+      <button id="btnExport">書き出す</button>
+      <button id="btnImport">読み込む</button>
+    </div>
+    <input type="file" id="fileSite" accept=".json,application/json" style="display:none">
+    <p class="hint">保存はこの端末の中だけなので、PCとiPadは別々です。PCで位置合わせをして書き出したファイルをOneDriveやメールでiPadに渡し、iPadで読み込めば同じ状態で開けます。</p>
+  </div>
+
   <div class="sec" id="secOffline">
     <h3>地図のオフライン保存</h3>
     <div class="row">
@@ -1285,30 +1295,75 @@ $('#btnSave').onclick=async()=>{
 async function loadSite(id){
   const rec=await new Promise(res=>{ const q=tx('readonly').get(id); q.onsuccess=()=>res(q.result); });
   if(!rec) return;
-  const im=new Image();
   const url=URL.createObjectURL(rec.blob);
+  applySite(rec,url,()=>URL.revokeObjectURL(url));
+}
+
+/* 保存一覧・現場ファイル共通の反映処理 */
+function applySite(rec,src,done){
+  const im=new Image();
   im.onload=()=>{
-    const cv=document.createElement('canvas'); cv.width=rec.w; cv.height=rec.h;
+    const w=im.naturalWidth,h=im.naturalHeight;
+    const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
     const cx=cv.getContext('2d',{willReadFrequently:true});
     cx.drawImage(im,0,0);
-    IMG.raw=cx.getImageData(0,0,rec.w,rec.h); IMG.w=rec.w; IMG.h=rec.h;
-    URL.revokeObjectURL(url);
-    $('#chkWhite').checked=rec.white; $('#thr').value=rec.thr; $('#thrVal').textContent=rec.thr;
-    $('#chkBoost').checked=rec.boost; $('#base').value=rec.base; setBase(rec.base);
-    $('#opacity').value=rec.opacity; $('#opacityVal').textContent=rec.opacity+'%';
-    processImage();
+    IMG.raw=cx.getImageData(0,0,w,h); IMG.w=w; IMG.h=h;
+    $('#chkWhite').checked=!!rec.white; $('#thr').value=rec.thr||225; $('#thrVal').textContent=rec.thr||225;
+    $('#chkBoost').checked=!!rec.boost;
+    if(rec.base){ $('#base').value=rec.base; setBase(rec.base); }
+    const op=(typeof rec.opacity==='number')?rec.opacity:70;
+    $('#opacity').value=op; $('#opacityVal').textContent=op+'%';
     ST={...rec.st};
-    overlay.addTo(map); overlay.setVisible(true); visible=true;
+    if(!map.hasLayer(overlay)) overlay.addTo(map);
+    processImage();
+    overlay.setVisible(true); visible=true;
     $('#btnToggleImg').textContent='図面 ON';
-    overlay.setOpacity(rec.opacity/100);
+    overlay.setOpacity(op/100);
     refresh();
     map.setView(L.latLng(ST.lat,ST.lng), 17);
     $('#siteName').textContent=rec.name; $('#siteInput').value=rec.name;
     closePanel(); setMode('map');
     toast('「'+rec.name+'」を読み込みました');
+    done&&done();
   };
-  im.src=url;
+  im.onerror=()=>{ toast('図面を読み込めませんでした'); done&&done(); };
+  im.src=src;
 }
+
+/* ===== 現場ファイルの書き出し・読み込み ===== */
+$('#btnExport').onclick=()=>{
+  if(!ST||!IMG.raw){ toast('先に図面を読み込んでください'); return; }
+  const name=($('#siteInput').value||$('#siteName').textContent||'現場').trim();
+  const cv=document.createElement('canvas'); cv.width=IMG.w; cv.height=IMG.h;
+  cv.getContext('2d').putImageData(IMG.raw,0,0);
+  let src=cv.toDataURL('image/png');
+  if(src.length>4000000) src=cv.toDataURL('image/jpeg',0.88);
+  const rec={v:1, app:'調査位置立会ビューア', name, planSrc:src,
+    st:{...ST}, base:$('#base').value, opacity:+$('#opacity').value,
+    white:$('#chkWhite').checked, thr:+$('#thr').value, boost:$('#chkBoost').checked,
+    updated:Date.now()};
+  const blob=new Blob([JSON.stringify(rec)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=name.replace(/[\\/:*?"<>|]/g,'_')+'.json';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000);
+  toast('書き出しました');
+};
+$('#btnImport').onclick=()=>$('#fileSite').click();
+$('#fileSite').onchange=e=>{
+  const f=e.target.files[0]; e.target.value=''; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    let rec;
+    try{ rec=JSON.parse(r.result); }catch(_){ toast('この形式のファイルは読み込めません'); return; }
+    if(!rec||!rec.planSrc||!rec.st){ toast('現場ファイルではないようです'); return; }
+    applySite(rec,rec.planSrc);
+  };
+  r.onerror=()=>toast('ファイルを読み込めませんでした');
+  r.readAsText(f);
+};
+
 openDB().then(renderSites);
 
 /* ============ オフライン地図（Service Worker） ============ */
