@@ -754,6 +754,12 @@ body.adjust #capture{background:rgba(31,111,208,.04)}
 
 .pin{width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
 .pin.a{background:#dc2626}.pin.b{background:#2563eb}.pin.gps{background:#059669}
+.gpsdot{position:relative;width:16px;height:16px;border-radius:50%;background:#0a7d55;
+  border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.gpsdot:after{content:"";position:absolute;left:50%;top:50%;width:14px;height:14px;
+  margin:-7px 0 0 -7px;border-radius:50%;background:rgba(10,125,85,.4);animation:gpspulse 1.8s ease-out infinite}
+@keyframes gpspulse{0%{transform:scale(1);opacity:.75}100%{transform:scale(3.4);opacity:0}}
+@media (prefers-reduced-motion:reduce){.gpsdot:after{animation:none}}
 
 #overlayImg{image-rendering:auto}
 #drop{position:absolute;inset:52px 0 0 0;z-index:1400;background:rgba(31,111,208,.15);
@@ -815,7 +821,9 @@ body.adjust #capture{background:rgba(31,111,208,.04)}
       <option value="osm">OpenStreetMap</option>
     </select>
     <div class="chk"><input type="checkbox" id="chkCross"><label for="chkCross" style="min-width:0">画面中心に十字線を表示</label></div>
-    <div class="row"><button style="flex:1" id="btnGps">現在地を表示</button></div>
+    <div class="row"><button style="flex:1" id="btnGps">現在地を表示（追跡）</button></div>
+    <div class="chk"><input type="checkbox" id="chkFollow" checked><label for="chkFollow" style="min-width:0">地図を現在地に追従させる</label></div>
+    <p class="hint" id="gpsInfo"></p>
   </div>
 
   <div class="sec">
@@ -1228,13 +1236,43 @@ $('#btnFull').onclick=()=>{
   else if(el.requestFullscreen) el.requestFullscreen();
   else toast('この端末では全画面に対応していません');
 };
+/* ===== 現在地のリアルタイム表示 ===== */
+let gpsWatch=null, gpsMarker=null, gpsCircle=null;
+function stopGps(msg){
+  if(gpsWatch!==null){ navigator.geolocation.clearWatch(gpsWatch); gpsWatch=null; }
+  if(gpsMarker){ map.removeLayer(gpsMarker); gpsMarker=null; }
+  if(gpsCircle){ map.removeLayer(gpsCircle); gpsCircle=null; }
+  $('#btnGps').textContent='現在地を表示（追跡）';
+  $('#btnGps').classList.remove('primary');
+  $('#gpsInfo').textContent=msg||'';
+}
 $('#btnGps').onclick=()=>{
-  if(!navigator.geolocation){ toast('現在地を取得できません'); return; }
-  navigator.geolocation.getCurrentPosition(p=>{
+  if(gpsWatch!==null){ stopGps('追跡を停止しました。'); return; }
+  if(!navigator.geolocation){ toast('この端末では現在地を取得できません'); return; }
+  $('#btnGps').textContent='追跡を停止';
+  $('#btnGps').classList.add('primary');
+  $('#gpsInfo').textContent='測位中…';
+  gpsWatch=navigator.geolocation.watchPosition(p=>{
     const ll=L.latLng(p.coords.latitude,p.coords.longitude);
-    addMarker(ll,'gps'); map.setView(ll, Math.max(map.getZoom(),17));
-  },()=>toast('現在地を取得できませんでした（位置情報の許可をご確認ください）'),{enableHighAccuracy:true,timeout:8000});
+    const acc=Math.max(p.coords.accuracy||0,1);
+    if(!gpsMarker){
+      gpsMarker=L.marker(ll,{interactive:false,zIndexOffset:1000,
+        icon:L.divIcon({className:'',html:'<div class="gpsdot"></div>',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(map);
+      gpsCircle=L.circle(ll,{radius:acc,color:'#0a7d55',weight:1,fillColor:'#0a7d55',fillOpacity:0.12,interactive:false}).addTo(map);
+      map.setView(ll, Math.max(map.getZoom(),17));
+    }else{
+      gpsMarker.setLatLng(ll);
+      gpsCircle.setLatLng(ll).setRadius(acc);
+      if($('#chkFollow').checked) map.panTo(ll,{animate:true,duration:0.6});
+    }
+    const t=new Date(p.timestamp).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    $('#gpsInfo').textContent=`精度 ±${Math.round(acc)} m　更新 ${t}`;
+  },err=>{
+    if(err.code===1) stopGps('位置情報が許可されていません。端末の設定でこのサイトに位置情報を許可してください。');
+    else $('#gpsInfo').textContent='測位できません。空の見える場所でお試しください。';
+  },{enableHighAccuracy:true, maximumAge:1000, timeout:20000});
 };
+addEventListener('pagehide',()=>{ if(gpsWatch!==null) stopGps(); });
 
 /* パネル開閉 */
 function closePanel(){ $('#panel').classList.remove('open'); }
