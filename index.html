@@ -1018,7 +1018,7 @@ body.measure .leaflet-container{cursor:crosshair}
       <button data-sc="0.99">縮小 1%</button><button data-sc="1.01">拡大 1%</button>
       <button data-sc="0.999">縮小 0.1%</button><button data-sc="1.001">拡大 0.1%</button>
     </div>
-    <p class="hint">「図面調整」モードでは、指でドラッグ＝移動、2本指＝拡大・回転です。</p>
+    <p class="hint">「図面調整」モードでは、指でドラッグ＝移動、2本指＝拡大・回転です。PCでは、マウスのドラッグで移動、<b>Shift＋ホイールで回転</b>（1目盛り約1°、Altも押すと0.1°）できます。</p>
   </div>
 
   <div class="sec">
@@ -1127,6 +1127,17 @@ const $ = s => document.querySelector(s);
 const D2R = Math.PI/180;
 
 /* ============ 地図 ============ */
+/* ホイール量 → 回転角（マウス1ノッチ≒5°、タッチパッドは細かく）。Windowsでは Shift+ホイールが横スクロール(deltaX)になるため両方を見る */
+function wheelDeg(e,perNotch){
+  let d = e.deltaY || e.deltaX; if(e.deltaMode===1) d*=33; else if(e.deltaMode===2) d*=300;
+  return Math.max(-perNotch, Math.min(perNotch, d/100*perNotch));
+}
+L.Map.ShiftKeyRotate.prototype._handleShiftScroll=function(e){
+  if(!e.shiftKey) return;
+  /* 拡大縮小のホイール処理には渡さない（無効化→再有効化だと直後の1目盛りが効かなくなるため） */
+  e.preventDefault(); e.stopImmediatePropagation();
+  const g=wheelDeg(e,5); if(g) this._map.setBearing(this._map.getBearing()+g);
+};
 /* ひねり角が小さいうちは回さない（ピンチ拡大のたびに地図が傾かないように） */
 (function(){
   const TG=L.Map.TouchGestures.prototype, oStart=TG._onTouchStart, oMove=TG._onTouchMove, TH=12;
@@ -1355,6 +1366,15 @@ function endPointer(e){
   if(pts.size===0) g=null; else startGesture();
 }
 cap.addEventListener('pointerup',endPointer);
+cap.addEventListener('wheel',e=>{
+  if(mode!=='adjust' || !e.shiftKey || !ST) return;
+  e.preventDefault();
+  if(lockedMsg()) return;
+  const g=wheelDeg(e, e.altKey?0.1:1); if(!g) return;
+  const ll=toLatLng(ptFromEvent(e)), px=llToPx(ll);
+  ST.rot -= g; if(ST.rot>180) ST.rot-=360; if(ST.rot<-180) ST.rot+=360;
+  anchor(px.x,px.y,ll); refresh();
+},{passive:false});
 cap.addEventListener('pointercancel',e=>{pts.delete(e.pointerId); if(pts.size===0)g=null;});
 
 function startGesture(){
