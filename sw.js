@@ -1,5 +1,5 @@
 /* 調査位置立会ビューア — オフライン用 Service Worker */
-const APP   = 'bview-app-v5';
+const APP   = 'bview-app-v6';
 const TILES = 'bview-tiles-v1';
 const SHELL = ['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./apple-touch-icon.png'];
 const TILE_HOST = /(^|\.)(cyberjapandata\.gsi\.go\.jp|tile\.openstreetmap\.org)$/;
