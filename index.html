@@ -799,6 +799,78 @@ body.drawmode.erase #capture{background:rgba(120,120,120,.10)}
 @keyframes gpspulse{0%{transform:scale(1);opacity:.75}100%{transform:scale(3.4);opacity:0}}
 @media (prefers-reduced-motion:reduce){.gpsdot:after{animation:none}}
 
+/* ---- 図面の固定（ロック） ---- */
+#btnLock{display:inline-flex;align-items:center;gap:5px}
+#btnLock svg{width:17px;height:17px;flex:none}
+#btnLock.on{background:#fff7ed;border-color:#c2410c;color:#9a3412;font-weight:700}
+body.locked #mAdj{opacity:.4}
+.lockNote{display:none;font-size:12px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:7px 9px;margin:0 0 8px}
+body.locked .lockNote{display:block}
+
+/* ---- 立会モード（Teams共有用の見せる画面） ---- */
+#btnPresent{display:inline-flex;align-items:center;gap:5px;background:#0a7d55;border-color:#0a7d55;color:#fff;font-weight:700}
+#btnPresent svg{width:17px;height:17px;flex:none}
+#presentBar{display:none;position:absolute;top:12px;left:12px;right:12px;z-index:1200;align-items:flex-start;gap:8px;pointer-events:none}
+#presentBar>*{pointer-events:auto}
+#presentBar .pname{font-size:14px;font-weight:700;background:rgba(255,255,255,.92);border:1px solid var(--line);
+  border-radius:10px;padding:9px 13px;box-shadow:0 2px 8px rgba(15,23,42,.12);max-width:50vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#presentBar button{box-shadow:0 2px 8px rgba(15,23,42,.15);font-weight:700;min-height:44px}
+body.present #presentBar{display:flex}
+body.present #bar, body.present #panel, body.present #guide, body.present .leaflet-control-zoom{display:none!important}
+body.present #capture{inset:0}
+body.present #cross{top:0}
+
+/* ---- 距離・方位 ---- */
+#btnMeas{display:flex;align-items:center;gap:7px;height:48px;min-height:48px;padding:0 16px 0 12px;border-radius:24px;
+  background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);font-size:14px;font-weight:700}
+#btnMeas svg{width:24px;height:24px;flex:none;color:#5b6a80}
+#btnMeas.on{background:#b91c1c;border-color:#b91c1c;color:#fff}
+#btnMeas.on svg{color:#fff}
+#measCard{display:none;min-width:220px;max-width:300px;background:rgba(255,255,255,.97);border:2px solid #b91c1c;border-radius:14px;
+  padding:10px 12px 10px 14px;box-shadow:var(--shadow)}
+#measCard.on{display:block}
+#measCard .mh{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#b91c1c}
+#measCard .mh button{margin-left:auto;min-height:28px;height:28px;padding:0 9px;font-size:12px;border-radius:14px}
+#measMain{font-size:24px;font-weight:800;line-height:1.3;margin-top:3px;font-variant-numeric:tabular-nums}
+#measSub{font-size:12px;color:var(--sub);margin-top:2px;line-height:1.5;font-variant-numeric:tabular-nums}
+#measSub .warn{color:var(--warn);font-weight:700}
+.tgt{position:relative;width:30px;height:30px}
+.tgt:before{content:"";position:absolute;inset:0;border-radius:50%;border:3px solid #b91c1c;background:rgba(185,28,28,.12);box-shadow:0 0 0 2px #fff}
+.tgt:after{content:"";position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:#b91c1c;box-shadow:0 0 0 2px #fff}
+.measTip{background:#b91c1c;color:#fff;border:0;font-weight:700;font-size:13px;padding:4px 9px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.measTip:before{display:none}
+body.measure .leaflet-container{cursor:crosshair}
+.leaflet-control-scale-line{font-size:11px;font-weight:600;background:rgba(255,255,255,.85);border-color:#16202f}
+@media (max-width:780px){#btnLock .tx,#btnPresent .tx{display:none}}
+@media (max-width:640px){#bar{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}#bar::-webkit-scrollbar{display:none}#bar>*{flex:none}#bar .spacer{flex:1 0 0}}
+
+/* ---- 現在地ボタン（地図右下） ---- */
+#locWrap{position:absolute;right:12px;bottom:34px;z-index:1140;transition:right .22s ease,bottom .22s ease;display:flex;flex-direction:column;align-items:flex-end;gap:8px;pointer-events:none}
+#locWrap>*{pointer-events:auto}
+#btnLoc{display:flex;align-items:center;gap:8px;height:56px;min-height:56px;padding:0 18px 0 14px;border-radius:28px;
+  background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);color:var(--ink);font-size:15px;font-weight:700}
+#btnLoc svg{width:28px;height:28px;flex:none;color:#5b6a80}
+#btnLoc:active{transform:scale(.97)}
+#btnLoc.locating svg{color:#0a7d55;animation:locblink 1s ease-in-out infinite}
+@keyframes locblink{50%{opacity:.3}}
+#btnLoc.track{color:#0a7d55;border-color:#0a7d55}
+#btnLoc.track svg{color:#0a7d55}
+#btnLoc.follow{background:#0a7d55;border-color:#0a7d55;color:#fff}
+#btnLoc.follow svg{color:#fff}
+#btnLoc.follow .dotc{fill:#fff}
+#locRow{display:none;align-items:center;gap:6px}
+#locWrap.on #locRow{display:flex}
+#locAcc{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:#0a7d55;background:rgba(255,255,255,.95);
+  border:1px solid var(--line);border-radius:14px;padding:5px 10px;box-shadow:0 2px 8px rgba(15,23,42,.12)}
+#locAcc.poor{color:var(--warn)}
+#btnLocStop{min-height:32px;height:32px;padding:0 12px;border-radius:16px;font-size:12px;font-weight:600;
+  box-shadow:0 2px 8px rgba(15,23,42,.12)}
+@media (prefers-reduced-motion:reduce){#btnLoc.locating svg{animation:none}}
+/* メニューを開いている間はパネルの左側に寄せる */
+@media (min-width:701px){body.panelopen #locWrap{right:332px;bottom:84px}}
+/* 狭い画面では透過スライダーの上に逃がす */
+@media (max-width:700px){#locWrap{bottom:84px}.leaflet-bottom.leaflet-left{bottom:66px}}
+
 #overlayImg{image-rendering:auto}
 #drop{position:absolute;inset:52px 0 0 0;z-index:1400;background:rgba(31,111,208,.15);
   border:4px dashed var(--accent);display:none;align-items:center;justify-content:center;
@@ -829,8 +901,17 @@ body.drawmode.erase #capture{background:rgba(120,120,120,.10)}
     <button id="mPhoto">写真番号</button>
     <button id="mDraw">手描き</button>
   </div>
+  <button id="btnLock" title="図面を固定して、うっかり動かないようにする"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path id="lockShackle" d="M8 11V8a4 4 0 0 1 7.5-2"/></svg><span class="tx" id="lockTx">図面固定</span></button>
   <button id="btnToggleImg" title="図面の表示/非表示">図面 ON</button>
+  <button id="btnPresent" title="操作ボタンを隠して、地図と図面だけを見せる"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span class="tx">立会モード</span></button>
   <button id="btnMenu" class="primary">☰ メニュー</button>
+</div>
+
+<div id="presentBar">
+  <span class="pname" id="presentName"></span>
+  <span class="spacer"></span>
+  <button id="btnToggleImg2" title="図面の表示/非表示">図面 ON</button>
+  <button id="btnPresentExit" title="立会モードを終了">✕ 立会モード終了</button>
 </div>
 
 <div id="guide"><span id="guideText"></span><button id="guideCancel">中止</button></div>
@@ -839,6 +920,28 @@ body.drawmode.erase #capture{background:rgba(120,120,120,.10)}
   <label>透過</label>
   <input type="range" id="opacity" min="0" max="100" value="70">
   <span class="val" id="opacityVal">70%</span>
+</div>
+
+<div id="locWrap">
+  <div id="measCard">
+    <div class="mh"><span>計画地点まで</span><button id="btnMeasClear">✕ 消す</button></div>
+    <div id="measMain">地図をタップ</div>
+    <div id="measSub">計画地点を地図上でタップしてください</div>
+  </div>
+  <button id="btnMeas" title="現在地から計画地点までの距離と方位">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="5" cy="19" r="2.2"/><circle cx="19" cy="5" r="2.2"/><path d="M6.6 17.4 17.4 6.6" stroke-dasharray="2.4 2.4"/>
+    </svg>
+    <span id="measLabel">距離・方位</span>
+  </button>
+  <div id="locRow"><span id="locAcc">測位中…</span><button id="btnLocStop" title="現在地の追跡を停止">✕ 停止</button></div>
+  <button id="btnLoc" title="現在地を表示">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="7"/><circle class="dotc" cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>
+      <path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/>
+    </svg>
+    <span id="locLabel">現在地</span>
+  </button>
 </div>
 
 <div id="drop">図面ファイルをドロップ</div>
@@ -863,11 +966,13 @@ body.drawmode.erase #capture{background:rgba(120,120,120,.10)}
     <div class="chk"><input type="checkbox" id="chkCross"><label for="chkCross" style="min-width:0">画面中心に十字線を表示</label></div>
     <div class="row"><button style="flex:1" id="btnGps">現在地を表示（追跡）</button></div>
     <div class="chk"><input type="checkbox" id="chkFollow" checked><label for="chkFollow" style="min-width:0">地図を現在地に追従させる</label></div>
+    <p class="hint">地図右下の「現在地」ボタンでも同じ操作ができます。地図を指で動かすと追従は一時停止し、ボタンをもう一度押すと現在地に戻ります。</p>
     <p class="hint" id="gpsInfo"></p>
   </div>
 
   <div class="sec">
     <h3>位置合わせ</h3>
+    <p class="lockNote">図面は固定中です。調整するには上部の「固定中」を押して解除してください。</p>
     <button class="primary" style="width:100%" id="btnTwoPoint">2点合わせを開始（推奨）</button>
     <p class="hint">図面上の目印（交差点・建物角など）と、地図上の同じ場所を2組タップすると、縮尺・回転・位置が自動で合います。</p>
     <div class="row"><label>回転</label><input type="range" id="rot" min="-180" max="180" step="0.1" value="0"><span class="val" id="rotVal">0.0°</span></div>
@@ -966,7 +1071,7 @@ body.drawmode.erase #capture{background:rgba(120,120,120,.10)}
       <button id="btnFull">全画面</button>
       <button id="btnReset">図面を外す</button>
     </div>
-    <p class="hint">Teams共有時は「メニュー」を閉じ、全画面にすると見やすくなります。</p>
+    <p class="hint">Teams共有時は上部の「立会モード」を押すと、操作ボタンが隠れて地図と図面だけの画面になります。全画面と組み合わせるとさらに見やすくなります。</p>
   </div>
 </div>
 
@@ -985,6 +1090,7 @@ const D2R = Math.PI/180;
 /* ============ 地図 ============ */
 const map = L.map('map',{zoomControl:false, attributionControl:true, maxZoom:22}).setView([35.681,139.767],16);
 L.control.zoom({position:'bottomleft'}).addTo(map);
+L.control.scale({position:'bottomleft', imperial:false, maxWidth:140}).addTo(map);
 map.attributionControl.setPrefix('');
 
 const BASES = {
@@ -1102,6 +1208,7 @@ function loadImageFile(f){
     refresh();
     $('#siteName').textContent = f.name.replace(/\.[^.]+$/,'');
     toast('図面を読み込みました。「2点合わせ」で位置を合わせてください');
+    setLock(false);
     setMode('adjust');
   };
   im.onerror=()=>toast('画像を読み込めませんでした');
@@ -1148,7 +1255,7 @@ function setMode(m){
   $('#capture').classList.toggle('on', m==='adjust'||m==='pick'||m==='photo'||m==='draw');
 }
 $('#mMap').onclick=()=>{ cancelPick(); setMode('map'); };
-$('#mAdj').onclick=()=>{ if(!ST){toast('先に図面を読み込んでください');return;} cancelPick(); setMode('adjust'); };
+$('#mAdj').onclick=()=>{ if(!ST){toast('先に図面を読み込んでください');return;} if(lockedMsg()) return; cancelPick(); setMode('adjust'); };
 $('#mPhoto').onclick=()=>{ cancelPick(); setMode('photo'); toast('地図をタップで番号を配置。押したまま撮影方向へ動かすと矢印が付きます'); };
 $('#mDraw').onclick=()=>{ cancelPick(); setMode('draw'); toast(eraser?'消しゴム：消したい線をタップ':'指でなぞると線が描けます'); };
 
@@ -1236,6 +1343,7 @@ function addMarker(ll,cls){ const m=L.marker(ll,{icon:L.divIcon({className:'',ht
 
 $('#btnTwoPoint').onclick=()=>{
   if(!ST){toast('先に図面を読み込んでください');return;}
+  if(lockedMsg()) return;
   closePanel();
   pick={step:0, p1:null, q1:null, p2:null, q2:null};
   clearMarkers();
@@ -1266,7 +1374,7 @@ function solveTwoPoint(){
   refresh();
   hideGuide(); setMode('map'); pick=null;
   setTimeout(clearMarkers,2500);
-  toast('位置合わせが完了しました');
+  toast('位置合わせが完了しました。ずれないよう上部の「図面固定」で固定できます');
 }
 function cancelPick(){ if(pick){pick=null; clearMarkers(); hideGuide();} }
 $('#guideCancel').onclick=()=>{ cancelPick(); setMode('map'); };
@@ -1285,6 +1393,7 @@ function syncSliders(){
 function pivotCenter(){ return ST ? llToPx(map.getCenter()) : null; }
 function withPivot(fn){
   if(!ST) return;
+  if(lockedMsg()){ syncSliders(); return; }
   const pv=pivotCenter(), ll=map.getCenter();
   fn();
   anchor(pv.x,pv.y,ll);
@@ -1309,15 +1418,17 @@ $('#chkBoost').onchange=processImage;
 $('#chkCross').onchange=e=>$('#cross').classList.toggle('on',e.target.checked);
 $('#base').onchange=e=>setBase(e.target.value);
 
-$('#btnToggleImg').onclick=()=>{
-  visible=!visible; overlay.setVisible(visible);
-  $('#btnToggleImg').textContent = visible?'図面 ON':'図面 OFF';
-};
+function setImgVisible(v){
+  visible=v; overlay.setVisible(visible);
+  $('#btnToggleImg').textContent = $('#btnToggleImg2').textContent = visible?'図面 ON':'図面 OFF';
+}
+$('#btnToggleImg').onclick=()=>setImgVisible(!visible);
+$('#btnToggleImg2').onclick=()=>setImgVisible(!visible);
 $('#btnLoad').onclick=()=>$('#file').click();
 $('#file').onchange=e=>{ if(e.target.files[0]) loadImageFile(e.target.files[0]); e.target.value=''; };
 $('#btnReset').onclick=()=>{
   if(map.hasLayer(overlay)) map.removeLayer(overlay);
-  ST=null; IMG={w:0,h:0,src:null,raw:null}; $('#siteName').textContent='図面未読込'; setMode('map');
+  ST=null; IMG={w:0,h:0,src:null,raw:null}; $('#siteName').textContent='図面未読込'; setLock(false); setMode('map');
 };
 $('#btnFull').onclick=()=>{
   const el=document.documentElement;
@@ -1592,42 +1703,187 @@ $('#btnPhotoGeo').onclick=()=>{
 };
 
 /* ===== 現在地のリアルタイム表示 ===== */
-let gpsWatch=null, gpsMarker=null, gpsCircle=null;
+let gpsWatch=null, gpsMarker=null, gpsCircle=null, gpsLast=null;
+function isFollow(){ return $('#chkFollow').checked; }
+function renderLoc(){
+  const b=$('#btnLoc'), on=gpsWatch!==null;
+  b.classList.toggle('locating', on && !gpsLast);
+  b.classList.toggle('track', on && !!gpsLast && !isFollow());
+  b.classList.toggle('follow', on && !!gpsLast && isFollow());
+  $('#locLabel').textContent = !on ? '現在地' : !gpsLast ? '測位中…' : isFollow() ? '追従中' : '現在地へ戻る';
+  b.title = !on ? '現在地を表示' : isFollow() ? '現在地を中心に表示中' : '現在地を画面中央に戻す';
+  $('#locWrap').classList.toggle('on', on);
+  $('#btnGps').textContent = on ? '追跡を停止' : '現在地を表示（追跡）';
+  $('#btnGps').classList.toggle('primary', on);
+}
 function stopGps(msg){
   if(gpsWatch!==null){ navigator.geolocation.clearWatch(gpsWatch); gpsWatch=null; }
   if(gpsMarker){ map.removeLayer(gpsMarker); gpsMarker=null; }
   if(gpsCircle){ map.removeLayer(gpsCircle); gpsCircle=null; }
-  $('#btnGps').textContent='現在地を表示（追跡）';
-  $('#btnGps').classList.remove('primary');
+  gpsLast=null;
   $('#gpsInfo').textContent=msg||'';
+  renderLoc();
+  if(typeof measOn!=='undefined' && measOn) renderMeas();
 }
-$('#btnGps').onclick=()=>{
-  if(gpsWatch!==null){ stopGps('追跡を停止しました。'); return; }
+function centerOnGps(){
+  if(!gpsLast) return;
+  map.setView(gpsLast, Math.max(map.getZoom(),17), {animate:true});
+}
+function startGps(){
   if(!navigator.geolocation){ toast('この端末では現在地を取得できません'); return; }
-  $('#btnGps').textContent='追跡を停止';
-  $('#btnGps').classList.add('primary');
+  $('#chkFollow').checked=true;
   $('#gpsInfo').textContent='測位中…';
+  $('#locAcc').textContent='測位中…'; $('#locAcc').classList.remove('poor');
   gpsWatch=navigator.geolocation.watchPosition(p=>{
     const ll=L.latLng(p.coords.latitude,p.coords.longitude);
     const acc=Math.max(p.coords.accuracy||0,1);
+    const first=!gpsLast; gpsLast=ll;
     if(!gpsMarker){
       gpsMarker=L.marker(ll,{interactive:false,zIndexOffset:1000,
         icon:L.divIcon({className:'',html:'<div class="gpsdot"></div>',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(map);
       gpsCircle=L.circle(ll,{radius:acc,color:'#0a7d55',weight:1,fillColor:'#0a7d55',fillOpacity:0.12,interactive:false}).addTo(map);
-      map.setView(ll, Math.max(map.getZoom(),17));
     }else{
       gpsMarker.setLatLng(ll);
       gpsCircle.setLatLng(ll).setRadius(acc);
-      if($('#chkFollow').checked) map.panTo(ll,{animate:true,duration:0.6});
     }
+    if(first) centerOnGps();
+    else if(isFollow()) map.panTo(ll,{animate:true,duration:0.6});
     const t=new Date(p.timestamp).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
     $('#gpsInfo').textContent=`精度 ±${Math.round(acc)} m　更新 ${t}`;
+    $('#locAcc').textContent=`精度 ±${Math.round(acc)} m`;
+    $('#locAcc').classList.toggle('poor', acc>30);
+    renderLoc();
+    if(measOn) renderMeas();
   },err=>{
-    if(err.code===1) stopGps('位置情報が許可されていません。端末の設定でこのサイトに位置情報を許可してください。');
-    else $('#gpsInfo').textContent='測位できません。空の見える場所でお試しください。';
+    if(err.code===1){
+      stopGps('位置情報が許可されていません。端末の設定でこのサイトに位置情報を許可してください。');
+      toast('位置情報が許可されていません（端末の設定で許可してください）');
+    }else{
+      $('#gpsInfo').textContent='測位できません。空の見える場所でお試しください。';
+      $('#locAcc').textContent='測位できません'; $('#locAcc').classList.add('poor');
+    }
   },{enableHighAccuracy:true, maximumAge:1000, timeout:20000});
+  renderLoc();
+}
+/* 地図右下の現在地ボタン：未表示→表示＋追従、追従解除中→現在地に戻す */
+$('#btnLoc').onclick=()=>{
+  if(gpsWatch===null){ startGps(); return; }
+  $('#chkFollow').checked=true;
+  centerOnGps();
+  renderLoc();
 };
+new MutationObserver(()=>document.body.classList.toggle('panelopen',$('#panel').classList.contains('open')))
+  .observe($('#panel'),{attributes:true,attributeFilter:['class']});
+document.body.classList.toggle('panelopen',$('#panel').classList.contains('open'));
+$('#btnLocStop').onclick=()=>{ stopGps('追跡を停止しました。'); toast('現在地の追跡を停止しました'); };
+$('#btnGps').onclick=()=>{ if(gpsWatch!==null) stopGps('追跡を停止しました。'); else startGps(); };
+$('#chkFollow').onchange=()=>{ if(isFollow()) centerOnGps(); renderLoc(); };
+/* 指で地図を動かしたら追従を一時停止（Googleマップと同じ挙動） */
+map.on('dragstart',()=>{ if(gpsWatch!==null && isFollow()){ $('#chkFollow').checked=false; renderLoc(); } });
 addEventListener('pagehide',()=>{ if(gpsWatch!==null) stopGps(); });
+
+/* ===== 図面の固定（ロック） ===== */
+let locked=false;
+function setLock(v){
+  locked=!!v;
+  document.body.classList.toggle('locked',locked);
+  $('#btnLock').classList.toggle('on',locked);
+  $('#lockTx').textContent = locked?'固定中':'図面固定';
+  $('#btnLock').title = locked?'図面は固定中です（押すと解除）':'図面を固定して、うっかり動かないようにする';
+  $('#lockShackle').setAttribute('d', locked?'M8 11V8a4 4 0 0 1 8 0v3':'M8 11V8a4 4 0 0 1 7.5-2');
+  ['#rot','#scale','#btnTwoPoint'].forEach(q=>$(q).disabled=locked);
+  document.querySelectorAll('[data-rot],[data-sc]').forEach(b=>b.disabled=locked);
+  if(locked && (mode==='adjust'||mode==='pick')){ cancelPick(); setMode('map'); }
+}
+function lockedMsg(){ if(locked){ toast('図面は固定中です。上部の「固定中」を押すと解除できます'); return true; } return false; }
+$('#btnLock').onclick=()=>{
+  if(!ST){ toast('先に図面を読み込んでください'); return; }
+  setLock(!locked);
+  toast(locked?'図面を固定しました。触っても動きません':'固定を解除しました。「図面調整」で動かせます');
+};
+
+/* ===== 立会モード（操作ボタンを隠した見せる画面） ===== */
+function setPresent(on){
+  document.body.classList.toggle('present',on);
+  if(on){
+    cancelPick(); setMode('map'); closePanel();
+    $('#presentName').textContent=$('#siteName').textContent;
+    $('#presentName').style.display = ST ? '' : 'none';
+    toast('立会モード：右上の「立会モード終了」で元に戻ります');
+  }
+  setTimeout(()=>map.invalidateSize(),50);
+}
+$('#btnPresent').onclick=()=>setPresent(true);
+$('#btnPresentExit').onclick=()=>setPresent(false);
+addEventListener('keydown',e=>{ if(e.key==='Escape' && document.body.classList.contains('present')) setPresent(false); });
+
+/* ===== 距離・方位（現在地 → 計画地点） ===== */
+let measOn=false, measTgt=null, measMk=null, measLine=null;
+const DIR16=['北','北北東','北東','東北東','東','東南東','南東','南南東','南','南南西','南西','西南西','西','西北西','北西','北北西'];
+/* GRS80楕円体の曲率半径で局所的な東西・南北距離を求める（数百m程度まで誤差は無視できる） */
+function enMeters(a,b){
+  const A=6378137, e2=0.00669438002290;
+  const ph=(a.lat+b.lat)/2*D2R, w=Math.sqrt(1-e2*Math.sin(ph)**2);
+  const M=A*(1-e2)/(w*w*w), N=A/w;
+  return {E:(b.lng-a.lng)*D2R*N*Math.cos(ph), N:(b.lat-a.lat)*D2R*M};
+}
+function fmtDist(d){ return d<100 ? d.toFixed(1)+' m' : d<1000 ? Math.round(d)+' m' : (d/1000).toFixed(2)+' km'; }
+function renderMeas(){
+  $('#btnMeas').classList.toggle('on',measOn);
+  document.body.classList.toggle('measure',measOn);
+  $('#measCard').classList.toggle('on',measOn);
+  $('#measLabel').textContent = measOn ? '距離・方位 ON' : '距離・方位';
+  if(!measOn) return;
+  if(!measTgt){
+    $('#measMain').textContent='地図をタップ';
+    $('#measSub').textContent='計画地点を地図上でタップしてください';
+    return;
+  }
+  if(!gpsLast){
+    $('#measMain').textContent='測位中…';
+    $('#measSub').textContent='現在地が取れると距離と方位を表示します';
+    if(measLine){ map.removeLayer(measLine); measLine=null; }
+    measMk.setTooltipContent('計画地点');
+    return;
+  }
+  const v=enMeters(gpsLast,measTgt), d=Math.hypot(v.E,v.N);
+  let az=Math.atan2(v.E,v.N)/D2R; if(az<0) az+=360;
+  const acc=Math.round(gpsCircle ? gpsCircle.getRadius() : 0);
+  const dir=DIR16[Math.round(az/22.5)%16];
+  $('#measMain').textContent = `${dir}へ ${fmtDist(d)}`;
+  $('#measSub').innerHTML = `方位 ${Math.round(az)}°（真北基準）・GPS精度 ±${acc} m`
+    + (d<=acc ? '<br><span class="warn">距離がGPS精度より小さいため、ほぼ到着とみなせます</span>' : '');
+  const ll=[gpsLast,measTgt];
+  if(!measLine) measLine=L.polyline(ll,{color:'#b91c1c',weight:3,dashArray:'8 6',interactive:false}).addTo(map);
+  else measLine.setLatLngs(ll);
+  measMk.setTooltipContent(fmtDist(d));
+}
+function clearMeasTarget(){
+  if(measMk){ map.removeLayer(measMk); measMk=null; }
+  if(measLine){ map.removeLayer(measLine); measLine=null; }
+  measTgt=null;
+}
+function setMeas(on){
+  measOn=on;
+  if(on){
+    cancelPick(); setMode('map');
+    if(gpsWatch===null) startGps();
+    toast('計画地点を地図上でタップしてください');
+  }else clearMeasTarget();
+  renderMeas();
+}
+$('#btnMeas').onclick=()=>setMeas(!measOn);
+$('#btnMeasClear').onclick=()=>setMeas(false);
+map.on('click',e=>{
+  if(!measOn || mode!=='map') return;
+  measTgt=e.latlng;
+  if(!measMk){
+    measMk=L.marker(measTgt,{interactive:false,zIndexOffset:900,
+      icon:L.divIcon({className:'',html:'<div class="tgt"></div>',iconSize:[30,30],iconAnchor:[15,15]})})
+      .bindTooltip('計画地点',{permanent:true,direction:'top',offset:[0,-16],className:'measTip'}).addTo(map);
+  }else measMk.setLatLng(measTgt);
+  renderMeas();
+});
 
 /* パネル開閉 */
 function closePanel(){ $('#panel').classList.remove('open'); }
@@ -1682,7 +1938,7 @@ $('#btnSave').onclick=async()=>{
     base:$('#base').value, opacity:+$('#opacity').value,
     white:$('#chkWhite').checked, thr:+$('#thr').value, boost:$('#chkBoost').checked,
     photos:JSON.parse(JSON.stringify(photos)), nextNo:+$('#nextNo').value,
-    strokes:JSON.parse(JSON.stringify(strokes)),
+    strokes:JSON.parse(JSON.stringify(strokes)), locked,
     updated:Date.now()};
   tx('readwrite').put(rec);
   setTimeout(()=>{renderSites(); toast('保存しました');},200);
@@ -1716,14 +1972,14 @@ function applySite(rec,src,done){
     ST={...rec.st};
     if(!map.hasLayer(overlay)) overlay.addTo(map);
     processImage();
-    overlay.setVisible(true); visible=true;
-    $('#btnToggleImg').textContent='図面 ON';
+    setImgVisible(true);
     overlay.setOpacity(op/100);
     refresh();
     map.setView(L.latLng(ST.lat,ST.lng), 17);
     $('#siteName').textContent=rec.name; $('#siteInput').value=rec.name;
     closePanel(); setMode('map');
-    toast('「'+rec.name+'」を読み込みました');
+    setLock(true);   /* 保存済みの現場は位置合わせ済みなので、立会中にずれないよう必ず固定して開く */
+    toast('「'+rec.name+'」を読み込みました'+(locked?'（図面は固定中）':''));
     done&&done();
   };
   im.onerror=()=>{ toast('図面を読み込めませんでした'); done&&done(); };
@@ -1742,7 +1998,7 @@ $('#btnExport').onclick=()=>{
     st:{...ST}, base:$('#base').value, opacity:+$('#opacity').value,
     white:$('#chkWhite').checked, thr:+$('#thr').value, boost:$('#chkBoost').checked,
     photos:JSON.parse(JSON.stringify(photos)), nextNo:+$('#nextNo').value,
-    strokes:JSON.parse(JSON.stringify(strokes)),
+    strokes:JSON.parse(JSON.stringify(strokes)), locked,
     updated:Date.now()};
   const blob=new Blob([JSON.stringify(rec)],{type:'application/json'});
   const a=document.createElement('a');
