@@ -882,7 +882,26 @@ body.measure .leaflet-container{cursor:crosshair}
 /* 狭い画面では透過スライダーの上に逃がす */
 @media (max-width:700px){#locWrap{bottom:84px}.leaflet-bottom.leaflet-left{bottom:66px}}
 
-#overlayImg{image-rendering:auto}
+.ovimg{image-rendering:auto}
+/* ---- 図面リスト ---- */
+.drw{display:flex;align-items:center;gap:6px;padding:6px 7px;border:2px solid var(--line);border-radius:9px;margin:6px 0;background:#fff}
+.drw.cur{border-color:var(--accent);background:#eef4fc}
+.drw input[type=checkbox]{width:20px;height:20px;flex:none;accent-color:var(--accent)}
+.drw input[type=text]{flex:1;min-width:0;padding:6px 7px;font-size:13px}
+.drw .sel{min-height:32px;padding:5px 8px;font-size:12px;flex:none}
+.drw.cur .sel{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.drw .del{min-height:32px;padding:5px 8px;font-size:12px;flex:none;color:var(--warn)}
+/* 図面調整中：どの図面を動かしているか */
+#adjSel{display:none;position:absolute;top:62px;left:50%;transform:translateX(-50%);z-index:1240;align-items:center;gap:8px;
+  background:rgba(255,255,255,.96);border:2px solid var(--accent);border-radius:12px;padding:6px 10px;box-shadow:var(--shadow);font-size:13px;font-weight:700;color:var(--accent);white-space:nowrap}
+#adjSel select{width:auto;max-width:46vw;font-weight:600}
+body.adjust.multi #adjSel{display:flex}
+/* 立会モードの図面切替・白抜き */
+#presentBar{flex-wrap:wrap}
+#presentDrs{display:flex;gap:6px;flex-wrap:wrap}
+#presentDrs button{min-height:40px;padding:6px 11px;font-size:12.5px;max-width:30vw;overflow:hidden;text-overflow:ellipsis}
+#presentDrs button.off{opacity:.55;text-decoration:line-through}
+#btnWhite2.on{background:#0a7d55;border-color:#0a7d55;color:#fff}
 #drop{position:absolute;inset:52px 0 0 0;z-index:1400;background:rgba(31,111,208,.15);
   border:4px dashed var(--accent);display:none;align-items:center;justify-content:center;
   font-size:20px;font-weight:700;color:var(--accent)}
@@ -933,10 +952,14 @@ body.measure .leaflet-container{cursor:crosshair}
 
 <div id="presentBar">
   <span class="pname" id="presentName"></span>
+  <span id="presentDrs"></span>
   <span class="spacer"></span>
+  <button id="btnWhite2" title="図面の白い背景を透明にする／戻す">白を透明 ON</button>
   <button id="btnToggleImg2" title="図面の表示/非表示">図面 ON</button>
   <button id="btnPresentExit" title="立会モードを終了">✕ 立会モード終了</button>
 </div>
+
+<div id="adjSel">調整する図面 <select id="adjSelect"></select></div>
 
 <div id="guide"><span id="guideText"></span><button id="guideCancel">中止</button></div>
 
@@ -973,9 +996,11 @@ body.measure .leaflet-container{cursor:crosshair}
 
 <div id="panel">
   <div class="sec">
-    <h3>図面の読み込み</h3>
-    <button class="primary" style="width:100%" id="btnLoad">画像ファイルを選ぶ（PNG / JPG）</button>
-    <input type="file" id="file" accept="image/*" style="display:none">
+    <h3>図面（複数可）</h3>
+    <button class="primary" style="width:100%" id="btnLoad">図面を追加（PNG / JPG）</button>
+    <input type="file" id="file" accept="image/*" multiple style="display:none">
+    <div id="drawList"></div>
+    <p class="hint">図面は何枚でも重ねられます。チェックで表示／非表示、「選択」を押した図面が位置合わせ・調整・見え方の対象になります（調整中は青い破線で囲みます）。名前はその場で書き換えられます。</p>
     <p class="hint">CADは「背景を白・線を濃く」した状態でPNGに書き出すと見やすくなります。PDFの場合はスクリーンショットか画像書き出しをご利用ください。</p>
   </div>
 
@@ -1022,7 +1047,7 @@ body.measure .leaflet-container{cursor:crosshair}
   </div>
 
   <div class="sec">
-    <h3>図面の見え方</h3>
+    <h3>図面の見え方（選択中の図面）</h3>
     <div class="chk"><input type="checkbox" id="chkWhite" checked><label for="chkWhite" style="min-width:0">白い背景を透明にする</label></div>
     <div class="row"><label>しきい値</label><input type="range" id="thr" min="120" max="255" value="225"><span class="val" id="thrVal">225</span></div>
     <div class="chk"><input type="checkbox" id="chkBoost"><label for="chkBoost" style="min-width:0">線を濃く（コントラスト強調）</label></div>
@@ -1102,7 +1127,7 @@ body.measure .leaflet-container{cursor:crosshair}
     <h3>その他</h3>
     <div class="grid2">
       <button id="btnFull">全画面</button>
-      <button id="btnReset">図面を外す</button>
+      <button id="btnReset">選択中の図面を外す</button>
     </div>
     <p class="hint">Teams共有時は上部の「立会モード」を押すと、操作ボタンが隠れて地図と図面だけの画面になります。全画面と組み合わせるとさらに見やすくなります。</p>
   </div>
@@ -1193,9 +1218,9 @@ function deltaEN(from,to){
 const RotatedOverlay = L.Layer.extend({
   initialize:function(){
     const el=document.createElement('img');
-    el.id='overlayImg';
+    el.className='ovimg';
     el.style.cssText='position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;pointer-events:none;';
-    this._el=el; this._st=null; this._w=0; this._h=0;
+    this._el=el; this._st=null; this._w=0; this._h=0; this._d=null;
   },
   onAdd:function(map){
     map.getPane('overlayPane').appendChild(this._el);
@@ -1216,27 +1241,34 @@ const RotatedOverlay = L.Layer.extend({
   setVisible:function(v){ if(this._el) this._el.style.display = v?'block':'none'; },
   _anim:function(e){ this._reset(e.zoom, e.center); },
   _reset:function(zoom,center){
-    if(!this._el || !ST || !this._w) return;
+    const D=this._d;
+    if(!this._el || !D || !D.st || !this._w) return;
     const m=this._map; if(!m) return;
     const proj = ll => (zoom!==undefined && zoom!==null) ? m._latLngToNewLayerPoint(ll,zoom,center) : m.latLngToLayerPoint(ll);
-    const TL=proj(pxToLL(0,0)), TR=proj(pxToLL(this._w,0)), BL=proj(pxToLL(0,this._h));
+    const TL=proj(pxToLLd(D,0,0)), TR=proj(pxToLLd(D,this._w,0)), BL=proj(pxToLLd(D,0,this._h));
     const a=(TR.x-TL.x)/this._w, b=(TR.y-TL.y)/this._w;
     const c=(BL.x-TL.x)/this._h, d=(BL.y-TL.y)/this._h;
     this._el.style.transform=`matrix(${a},${b},${c},${d},${TL.x},${TL.y})`;
   }
 });
-const overlay = new RotatedOverlay();
 
 /* ============ 状態 ============ */
-let ST = null;            // {lat,lng,mpp,rot}
-let IMG = {w:0,h:0, src:null, raw:null};  // rawはImageData
-let visible = true;
+/* 図面は複数持てる。DR＝図面の一覧、curD＝選択中の図面。
+   ST・IMG・overlay は「選択中の図面」の中身を指す別名（位置合わせや調整はこれを通して選択中の図面だけを動かす） */
+let DR = [];              // {id,name,st:{lat,lng,mpp,rot},img:{w,h,src,raw},ov,visible,white,thr,boost,cache}
+let curD = null;
+let ST = null;            // = curD.st
+let IMG = {w:0,h:0, src:null, raw:null};  // = curD.img（rawはImageData）
+let overlay = null;       // = curD.ov
+let visible = true;       // 「図面 ON/OFF」＝全図面の一括表示
 
-function pxToLL(px,py){
-  const u=(px-IMG.w/2)*ST.mpp, v=-(py-IMG.h/2)*ST.mpp;
-  const t=ST.rot*D2R, cs=Math.cos(t), sn=Math.sin(t);
-  return offsetLL(ST.lat, ST.lng, u*cs - v*sn, u*sn + v*cs);
+function pxToLLd(d,px,py){
+  const S=d.st, I=d.img;
+  const u=(px-I.w/2)*S.mpp, v=-(py-I.h/2)*S.mpp;
+  const t=S.rot*D2R, cs=Math.cos(t), sn=Math.sin(t);
+  return offsetLL(S.lat, S.lng, u*cs - v*sn, u*sn + v*cs);
 }
+function pxToLL(px,py){ return pxToLLd({st:ST,img:IMG},px,py); }
 function llToPx(ll){
   const d=deltaEN(L.latLng(ST.lat,ST.lng), ll);
   const t=ST.rot*D2R, cs=Math.cos(t), sn=Math.sin(t);
@@ -1251,11 +1283,103 @@ function anchor(px,py,ll){
   const c=offsetLL(ll.lat,ll.lng,-E,-N);
   ST.lat=c.lat; ST.lng=c.lng;
 }
-function refresh(){ overlay.setState(ST); syncSliders(); }
+function refresh(){ if(overlay) overlay.setState(ST); syncSliders(); updateFrame(); }
+/* 調整中は選択中の図面を青い破線で囲む */
+let adjFrame=null;
+function updateFrame(){
+  const show = curD && (mode==='adjust'||mode==='pick');
+  if(!show){ if(adjFrame){ map.removeLayer(adjFrame); adjFrame=null; } return; }
+  const c=[pxToLL(0,0),pxToLL(IMG.w,0),pxToLL(IMG.w,IMG.h),pxToLL(0,IMG.h)];
+  if(!adjFrame) adjFrame=L.polygon(c,{color:'#1f6fd0',weight:2.5,dashArray:'8 6',fill:false,interactive:false}).addTo(map);
+  else adjFrame.setLatLngs(c);
+}
+
+/* ---- 図面一覧の操作 ---- */
+function newDrawing(name,raw,w,h,st,opt){
+  opt=opt||{};
+  const d={id:'d'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), name:name||('図面'+(DR.length+1)),
+    st, img:{w,h,src:null,raw}, ov:new RotatedOverlay(), visible:opt.visible!==false,
+    white:opt.white!==undefined?!!opt.white:true, thr:opt.thr||225, boost:!!opt.boost, cache:{}};
+  d.ov._d=d;
+  d.ov.addTo(map);
+  d.ov.setOpacity($('#opacity').value/100);
+  d.ov.setVisible(visible && d.visible);
+  DR.push(d);
+  return d;
+}
+function selectDrawing(d,quiet){
+  curD=d||null;
+  ST=curD?curD.st:null; IMG=curD?curD.img:{w:0,h:0,src:null,raw:null}; overlay=curD?curD.ov:null;
+  if(curD){
+    $('#chkWhite').checked=curD.white; $('#thr').value=curD.thr; $('#thrVal').textContent=curD.thr; $('#chkBoost').checked=curD.boost;
+    if(!curD.visible){ curD.visible=true; applyVis(); }
+  }
+  refresh(); renderDrawList();
+  if(curD && !quiet && DR.length>1) toast('「'+curD.name+'」を選択しました');
+}
+function removeDrawing(d){
+  if(!d) return;
+  map.removeLayer(d.ov);
+  Object.values(d.cache||{}).forEach(u=>{ try{URL.revokeObjectURL(u);}catch(_){} });
+  DR=DR.filter(x=>x!==d);
+  if(curD===d) selectDrawing(DR[DR.length-1]||null,true);
+  if(!DR.length){ $('#siteName').textContent='図面未読込'; setLock(false); setMode('map'); }
+  renderDrawList();
+}
+function clearDrawings(){ [...DR].forEach(d=>{ map.removeLayer(d.ov); Object.values(d.cache||{}).forEach(u=>{try{URL.revokeObjectURL(u);}catch(_){}}); }); DR=[]; selectDrawing(null,true); }
+function applyVis(){ DR.forEach(d=>d.ov.setVisible(visible && d.visible)); renderPresentDrs(); }
+function renderDrawList(){
+  const box=$('#drawList'); if(!box) return;
+  box.innerHTML='';
+  DR.forEach(d=>{
+    const row=document.createElement('div'); row.className='drw'+(d===curD?' cur':'');
+    const ck=document.createElement('input'); ck.type='checkbox'; ck.checked=d.visible; ck.title='表示／非表示';
+    ck.onchange=()=>{ d.visible=ck.checked; applyVis(); };
+    const nm=document.createElement('input'); nm.type='text'; nm.value=d.name;
+    nm.onchange=()=>{ d.name=nm.value.trim()||d.name; nm.value=d.name; renderAdjSel(); renderPresentDrs(); };
+    const sel=document.createElement('button'); sel.className='sel'; sel.textContent=d===curD?'選択中':'選択';
+    sel.onclick=()=>selectDrawing(d);
+    const del=document.createElement('button'); del.className='del'; del.textContent='外す';
+    del.onclick=()=>{ removeDrawing(d); toast('「'+d.name+'」を外しました'); };
+    row.append(ck,nm,sel,del); box.appendChild(row);
+  });
+  if(!DR.length) box.innerHTML='<p class="hint" style="margin:8px 0 0">まだ図面がありません。</p>';
+  document.body.classList.toggle('multi', DR.length>1);
+  renderAdjSel(); renderPresentDrs(); renderWhiteBtn();
+}
+function renderAdjSel(){
+  const s=$('#adjSelect'); if(!s) return;
+  s.innerHTML=DR.map(d=>`<option value="${d.id}"${d===curD?' selected':''}></option>`).join('');
+  [...s.options].forEach((o,i)=>o.textContent=DR[i].name);
+}
+function renderPresentDrs(){
+  const box=$('#presentDrs'); if(!box) return;
+  box.innerHTML='';
+  if(DR.length<2) return;
+  DR.forEach(d=>{
+    const b=document.createElement('button'); b.textContent=d.name; b.className=(visible&&d.visible)?'':'off';
+    b.title='この図面を表示／非表示';
+    b.onclick=()=>{ if(!visible){ d.visible=true; setImgVisible(true); } else { d.visible=!d.visible; applyVis(); } renderDrawList(); };
+    box.appendChild(b);
+  });
+  placeCompass();
+}
+/* 立会モードでは方位記号を上のボタン列のすぐ下に置く（狭い画面でボタン列が2段になっても重ならない） */
+function placeCompass(){
+  const c=$('#compass'); if(!c) return;
+  if(document.body.classList.contains('present')){ const r=$('#presentBar').getBoundingClientRect(); c.style.top=Math.max(64,Math.round(r.bottom+8))+'px'; }
+  else c.style.top='';
+}
+addEventListener('resize',placeCompass);
+function renderWhiteBtn(){
+  const b=$('#btnWhite2'); if(!b) return;
+  const on = DR.length>0 && DR.every(d=>d.white);
+  b.classList.toggle('on',on); b.textContent = on?'白を透明 ON':'白を透明 OFF';
+}
 
 /* ============ 画像処理 ============ */
 const MAXDIM=4096;
-function loadImageFile(f){
+function loadImageFile(f){ return new Promise(done=>{
   const url=URL.createObjectURL(f);
   const im=new Image();
   im.onload=()=>{
@@ -1265,52 +1389,62 @@ function loadImageFile(f){
     const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
     const cx=cv.getContext('2d',{willReadFrequently:true});
     cx.drawImage(im,0,0,w,h);
-    IMG.raw = cx.getImageData(0,0,w,h);
-    IMG.w=w; IMG.h=h;
+    const raw = cx.getImageData(0,0,w,h);
     URL.revokeObjectURL(url);
     // 初期配置：画面中央に、画面幅の6割で置く
     const c=map.getCenter();
     const sw=map.getSize().x;
     const mppScreen = 40075016.686*Math.cos(c.lat*D2R)/(256*Math.pow(2,map.getZoom()));
-    ST = {lat:c.lat, lng:c.lng, mpp: mppScreen*sw*0.6/w, rot:0};
-    if(!map.hasLayer(overlay)) overlay.addTo(map);
-    processImage();
-    overlay.setVisible(visible);
-    overlay.setOpacity($('#opacity').value/100);
-    refresh();
-    $('#siteName').textContent = f.name.replace(/\.[^.]+$/,'');
-    toast('図面を読み込みました。「2点合わせ」で位置を合わせてください');
+    const name=f.name.replace(/\.[^.]+$/,'');
+    const d=newDrawing(name, raw, w, h, {lat:c.lat, lng:c.lng, mpp: mppScreen*sw*0.6/w, rot:0});
+    processImage(d);
+    if(!visible) setImgVisible(true);
+    selectDrawing(d,true);
+    if($('#siteName').textContent==='図面未読込') $('#siteName').textContent = name;
+    toast(DR.length>1 ? `「${name}」を追加しました（${DR.length}枚目）。「2点合わせ」で位置を合わせてください` : '図面を読み込みました。「2点合わせ」で位置を合わせてください');
     setLock(false);
     setMode('adjust');
+    done();
   };
-  im.onerror=()=>toast('画像を読み込めませんでした');
+  im.onerror=()=>{ toast('画像を読み込めませんでした'); done(); };
   im.src=url;
-}
-function processImage(){
-  if(!IMG.raw) return;
-  const w=IMG.w,h=IMG.h;
+}); }
+/* 複数選んだときは選んだ順に1枚ずつ読み込む */
+async function loadImageFiles(files){ for(const f of files){ if(f.type.startsWith('image/')) await loadImageFile(f); } }
+/* 白抜き・線の強調は図面ごとの設定。同じ設定の結果は覚えておき、ON/OFFの切替を一瞬で済ませる */
+function procKey(d){ return `${d.white?1:0}_${d.thr}_${d.boost?1:0}`; }
+function processImage(d){
+  d = d || curD;
+  if(!d || !d.img.raw) return Promise.resolve();
+  const key=procKey(d);
+  if(d.cache[key]){ d.img.src=d.cache[key]; d.ov.setImage(d.img.src,d.img.w,d.img.h); return Promise.resolve(); }
+  const w=d.img.w,h=d.img.h, raw=d.img.raw;
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
   const cx=cv.getContext('2d');
-  const out=new ImageData(new Uint8ClampedArray(IMG.raw.data), w, h);
-  const d=out.data;
-  const white=$('#chkWhite').checked, thr=+$('#thr').value, boost=$('#chkBoost').checked;
-  for(let i=0;i<d.length;i+=4){
-    let r=d[i],g=d[i+1],b=d[i+2];
+  const out=new ImageData(new Uint8ClampedArray(raw.data), w, h);
+  const px=out.data;
+  const white=d.white, thr=d.thr, boost=d.boost;
+  for(let i=0;i<px.length;i+=4){
+    let r=px[i],g=px[i+1],b=px[i+2];
     if(white){
-      const mx=Math.max(r,g,b), mn=Math.min(r,g,b);
-      if(mn>=thr){ d[i+3]=0; continue; }
-      if(mn>thr-45){ d[i+3]=Math.round(d[i+3]*(thr-mn)/45); }
-      void mx;
+      const mn=Math.min(r,g,b);
+      if(mn>=thr){ px[i+3]=0; continue; }
+      if(mn>thr-45){ px[i+3]=Math.round(px[i+3]*(thr-mn)/45); }
     }
     if(boost){
-      d[i]  = r<160? Math.max(0,r-70): r;
-      d[i+1]= g<160? Math.max(0,g-70): g;
-      d[i+2]= b<160? Math.max(0,b-70): b;
+      px[i]  = r<160? Math.max(0,r-70): r;
+      px[i+1]= g<160? Math.max(0,g-70): g;
+      px[i+2]= b<160? Math.max(0,b-70): b;
     }
   }
   cx.putImageData(out,0,0);
-  IMG.src=cv.toDataURL('image/png');
-  overlay.setImage(IMG.src,w,h);
+  return new Promise(res=>cv.toBlob(bl=>{
+    const u=URL.createObjectURL(bl);
+    const ks=Object.keys(d.cache); if(ks.length>=4){ try{URL.revokeObjectURL(d.cache[ks[0]]);}catch(_){} delete d.cache[ks[0]]; }
+    d.cache[key]=u;
+    if(procKey(d)===key){ d.img.src=u; d.ov.setImage(u,w,h); }
+    res();
+  },'image/png'));
 }
 
 /* ============ モード ============ */
@@ -1325,7 +1459,9 @@ function setMode(m){
   document.body.classList.toggle('photomode',m==='photo');
   document.body.classList.toggle('drawmode',m==='draw');
   $('#capture').classList.toggle('on', m==='adjust'||m==='pick'||m==='photo'||m==='draw');
+  updateFrame();
 }
+$('#adjSelect').onchange=e=>{ const d=DR.find(x=>x.id===e.target.value); if(d) selectDrawing(d); };
 $('#mMap').onclick=()=>{ cancelPick(); setMode('map'); };
 $('#mAdj').onclick=()=>{ if(!ST){toast('先に図面を読み込んでください');return;} if(lockedMsg()) return; cancelPick(); setMode('adjust'); };
 $('#mPhoto').onclick=()=>{ cancelPick(); setMode('photo'); toast('地図をタップで番号を配置。押したまま撮影方向へ動かすと矢印が付きます'); };
@@ -1491,25 +1627,36 @@ document.querySelectorAll('[data-rot]').forEach(b=>b.onclick=()=>withPivot(()=>{
 }));
 document.querySelectorAll('[data-sc]').forEach(b=>b.onclick=()=>withPivot(()=>{ ST.mpp*=parseFloat(b.dataset.sc); }));
 
-$('#opacity').oninput=e=>{ $('#opacityVal').textContent=e.target.value+'%'; overlay.setOpacity(e.target.value/100); };
+$('#opacity').oninput=e=>{ $('#opacityVal').textContent=e.target.value+'%'; DR.forEach(d=>d.ov.setOpacity(e.target.value/100)); };
 $('#thr').oninput=e=>{ $('#thrVal').textContent=e.target.value; };
-$('#thr').onchange=processImage;
-$('#chkWhite').onchange=processImage;
-$('#chkBoost').onchange=processImage;
+$('#thr').onchange=e=>{ if(!curD) return; curD.thr=+e.target.value; processImage(curD); };
+$('#chkWhite').onchange=e=>{ if(!curD) return; curD.white=e.target.checked; processImage(curD); renderWhiteBtn(); };
+$('#chkBoost').onchange=e=>{ if(!curD) return; curD.boost=e.target.checked; processImage(curD); };
+/* 立会モードのワンボタン：全図面の「白を透明」をまとめて切り替える */
+$('#btnWhite2').onclick=async()=>{
+  if(!DR.length){ toast('図面がありません'); return; }
+  const on=!DR.every(d=>d.white);
+  DR.forEach(d=>d.white=on);
+  if(curD) $('#chkWhite').checked=on;
+  renderWhiteBtn();
+  if(DR.some(d=>!d.cache[procKey(d)])) toast(on?'白い背景を透明にしています…':'白い背景を戻しています…');
+  for(const d of DR) await processImage(d);
+  toast(on?'白い背景を透明にしました':'白い背景を元に戻しました');
+};
 $('#chkCross').onchange=e=>$('#cross').classList.toggle('on',e.target.checked);
 $('#base').onchange=e=>setBase(e.target.value);
 
 function setImgVisible(v){
-  visible=v; overlay.setVisible(visible);
+  visible=v; applyVis();
   $('#btnToggleImg').textContent = $('#btnToggleImg2').textContent = visible?'図面 ON':'図面 OFF';
 }
 $('#btnToggleImg').onclick=()=>setImgVisible(!visible);
 $('#btnToggleImg2').onclick=()=>setImgVisible(!visible);
 $('#btnLoad').onclick=()=>$('#file').click();
-$('#file').onchange=e=>{ if(e.target.files[0]) loadImageFile(e.target.files[0]); e.target.value=''; };
+$('#file').onchange=e=>{ const fs=[...e.target.files]; e.target.value=''; loadImageFiles(fs); };
 $('#btnReset').onclick=()=>{
-  if(map.hasLayer(overlay)) map.removeLayer(overlay);
-  ST=null; IMG={w:0,h:0,src:null,raw:null}; $('#siteName').textContent='図面未読込'; setLock(false); setMode('map');
+  if(!curD){ toast('外す図面がありません'); return; }
+  const n=curD.name; removeDrawing(curD); toast('「'+n+'」を外しました');
 };
 $('#btnFull').onclick=()=>{
   const el=document.documentElement;
@@ -1933,6 +2080,7 @@ function setPresent(on){
     $('#presentName').style.display = ST ? '' : 'none';
     toast('立会モード：右上の「立会モード終了」で元に戻ります');
   }
+  placeCompass();
   setTimeout(()=>map.invalidateSize(),50);
 }
 $('#btnPresent').onclick=()=>setPresent(true);
@@ -2019,7 +2167,7 @@ function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('on'
 /* ドラッグ&ドロップ */
 ['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();$('#drop').classList.add('on');}));
 ['dragleave','drop'].forEach(ev=>document.addEventListener(ev,e=>{e.preventDefault();if(ev==='drop'||e.relatedTarget===null)$('#drop').classList.remove('on');}));
-document.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f&&f.type.startsWith('image/')) loadImageFile(f); });
+document.addEventListener('drop',e=>{ loadImageFiles([...e.dataTransfer.files]); });
 
 /* ============ 保存（IndexedDB） ============ */
 let db=null;
@@ -2049,16 +2197,19 @@ async function renderSites(){
   if(!arr.length) box.innerHTML='<p class="hint">保存された現場はありません。</p>';
 }
 $('#btnSave').onclick=async()=>{
-  if(!ST||!IMG.raw){ toast('先に図面を読み込んでください'); return; }
+  if(!DR.length){ toast('先に図面を読み込んでください'); return; }
   const name=($('#siteInput').value||$('#siteName').textContent||'無題').trim();
   if(!db) await openDB();
   if(!db){ toast('この端末では保存できません'); return; }
-  const cv=document.createElement('canvas'); cv.width=IMG.w; cv.height=IMG.h;
-  cv.getContext('2d').putImageData(IMG.raw,0,0);
-  const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
-  const rec={id:'s'+Date.now(), name, blob, w:IMG.w, h:IMG.h, st:{...ST},
+  const drawings=[];
+  for(const d of DR){
+    const cv=document.createElement('canvas'); cv.width=d.img.w; cv.height=d.img.h;
+    cv.getContext('2d').putImageData(d.img.raw,0,0);
+    const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
+    drawings.push({name:d.name, blob, w:d.img.w, h:d.img.h, st:{...d.st}, visible:d.visible, white:d.white, thr:d.thr, boost:d.boost});
+  }
+  const rec={id:'s'+Date.now(), v:2, name, drawings, cur:Math.max(0,DR.indexOf(curD)), visible,
     base:$('#base').value, opacity:+$('#opacity').value,
-    white:$('#chkWhite').checked, thr:+$('#thr').value, boost:$('#chkBoost').checked,
     photos:JSON.parse(JSON.stringify(photos)), nextNo:+$('#nextNo').value,
     strokes:JSON.parse(JSON.stringify(strokes)), locked, bearing:map.getBearing(),
     updated:Date.now()};
@@ -2068,58 +2219,78 @@ $('#btnSave').onclick=async()=>{
 async function loadSite(id){
   const rec=await new Promise(res=>{ const q=tx('readonly').get(id); q.onsuccess=()=>res(q.result); });
   if(!rec) return;
-  const url=URL.createObjectURL(rec.blob);
-  applySite(rec,url,()=>URL.revokeObjectURL(url));
+  applySite(rec);
 }
 
-/* 保存一覧・現場ファイル共通の反映処理 */
-function applySite(rec,src,done){
-  const im=new Image();
-  im.onload=()=>{
-    const w=im.naturalWidth,h=im.naturalHeight;
-    const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
-    const cx=cv.getContext('2d',{willReadFrequently:true});
-    cx.drawImage(im,0,0);
-    IMG.raw=cx.getImageData(0,0,w,h); IMG.w=w; IMG.h=h;
-    $('#chkWhite').checked=!!rec.white; $('#thr').value=rec.thr||225; $('#thrVal').textContent=rec.thr||225;
-    $('#chkBoost').checked=!!rec.boost;
-    if(rec.base){ $('#base').value=rec.base; setBase(rec.base); }
-    const op=(typeof rec.opacity==='number')?rec.opacity:70;
-    $('#opacity').value=op; $('#opacityVal').textContent=op+'%';
-    photos = Array.isArray(rec.photos) ? JSON.parse(JSON.stringify(rec.photos)) : [];
-    photoSel=null; $('#nextNo').value = rec.nextNo || (photos.length+1);
-    redrawPhotos();
-    strokes = Array.isArray(rec.strokes) ? JSON.parse(JSON.stringify(rec.strokes)) : [];
-    redrawStrokes();
-    ST={...rec.st};
-    if(!map.hasLayer(overlay)) overlay.addTo(map);
-    processImage();
-    setImgVisible(true);
-    overlay.setOpacity(op/100);
-    refresh();
-    map.setView(L.latLng(ST.lat,ST.lng), 17);
-    map.setBearing(typeof rec.bearing==='number' ? rec.bearing : 0);
-    $('#siteName').textContent=rec.name; $('#siteInput').value=rec.name;
-    closePanel(); setMode('map');
-    setLock(true);   /* 保存済みの現場は位置合わせ済みなので、立会中にずれないよう必ず固定して開く */
-    toast('「'+rec.name+'」を読み込みました'+(locked?'（図面は固定中）':''));
-    done&&done();
-  };
-  im.onerror=()=>{ toast('図面を読み込めませんでした'); done&&done(); };
-  im.src=src;
+/* 保存一覧・現場ファイル共通の反映処理
+   新形式：rec.drawings=[{name, blob|planSrc, st, visible, white, thr, boost}]
+   旧形式（図面1枚）：rec.blob|rec.planSrc, rec.st, rec.white, rec.thr, rec.boost */
+function siteDrawings(rec){
+  if(Array.isArray(rec.drawings) && rec.drawings.length) return rec.drawings;
+  return [{name:rec.name, blob:rec.blob, planSrc:rec.planSrc, st:rec.st, visible:true, white:!!rec.white, thr:rec.thr||225, boost:!!rec.boost}];
+}
+function loadRaw(src){
+  return new Promise((res,rej)=>{
+    const im=new Image();
+    im.onload=()=>{
+      const w=im.naturalWidth,h=im.naturalHeight;
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      const cx=cv.getContext('2d',{willReadFrequently:true});
+      cx.drawImage(im,0,0);
+      res({raw:cx.getImageData(0,0,w,h),w,h});
+    };
+    im.onerror=rej;
+    im.src=src;
+  });
+}
+async function applySite(rec){
+  const list=siteDrawings(rec);
+  let loaded;
+  try{
+    loaded=await Promise.all(list.map(async x=>{
+      const url = x.blob ? URL.createObjectURL(x.blob) : x.planSrc;
+      try{ return await loadRaw(url); } finally { if(x.blob) URL.revokeObjectURL(url); }
+    }));
+  }catch(_){ toast('図面を読み込めませんでした'); return; }
+  clearDrawings();
+  if(rec.base){ $('#base').value=rec.base; setBase(rec.base); }
+  const op=(typeof rec.opacity==='number')?rec.opacity:70;
+  $('#opacity').value=op; $('#opacityVal').textContent=op+'%';
+  visible = rec.visible!==false;
+  list.forEach((x,i)=>{
+    const L_=loaded[i];
+    const d=newDrawing(x.name||('図面'+(i+1)), L_.raw, L_.w, L_.h, {...x.st}, {visible:x.visible!==false, white:x.white, thr:x.thr, boost:x.boost});
+    processImage(d);
+  });
+  setImgVisible(visible);
+  photos = Array.isArray(rec.photos) ? JSON.parse(JSON.stringify(rec.photos)) : [];
+  photoSel=null; $('#nextNo').value = rec.nextNo || (photos.length+1);
+  redrawPhotos();
+  strokes = Array.isArray(rec.strokes) ? JSON.parse(JSON.stringify(rec.strokes)) : [];
+  redrawStrokes();
+  selectDrawing(DR[Math.min(rec.cur||0, DR.length-1)], true);
+  const f=DR[0].st;
+  map.setView(L.latLng(f.lat,f.lng), 17);
+  map.setBearing(typeof rec.bearing==='number' ? rec.bearing : 0);
+  $('#siteName').textContent=rec.name; $('#siteInput').value=rec.name;
+  closePanel(); setMode('map');
+  setLock(true);   /* 保存済みの現場は位置合わせ済みなので、立会中にずれないよう必ず固定して開く */
+  toast('「'+rec.name+'」を読み込みました'+(DR.length>1?`（図面${DR.length}枚）`:'')+(locked?'・図面は固定中':''));
 }
 
 /* ===== 現場ファイルの書き出し・読み込み ===== */
 $('#btnExport').onclick=()=>{
-  if(!ST||!IMG.raw){ toast('先に図面を読み込んでください'); return; }
+  if(!DR.length){ toast('先に図面を読み込んでください'); return; }
   const name=($('#siteInput').value||$('#siteName').textContent||'現場').trim();
-  const cv=document.createElement('canvas'); cv.width=IMG.w; cv.height=IMG.h;
-  cv.getContext('2d').putImageData(IMG.raw,0,0);
-  let src=cv.toDataURL('image/png');
-  if(src.length>4000000) src=cv.toDataURL('image/jpeg',0.88);
-  const rec={v:1, app:'調査位置立会ビューア', name, planSrc:src,
-    st:{...ST}, base:$('#base').value, opacity:+$('#opacity').value,
-    white:$('#chkWhite').checked, thr:+$('#thr').value, boost:$('#chkBoost').checked,
+  const drawings=DR.map(d=>{
+    const cv=document.createElement('canvas'); cv.width=d.img.w; cv.height=d.img.h;
+    cv.getContext('2d').putImageData(d.img.raw,0,0);
+    let src=cv.toDataURL('image/png');
+    if(src.length>4000000) src=cv.toDataURL('image/jpeg',0.88);
+    return {name:d.name, planSrc:src, st:{...d.st}, visible:d.visible, white:d.white, thr:d.thr, boost:d.boost};
+  });
+  const rec={v:2, app:'調査位置立会ビューア', name, drawings, cur:Math.max(0,DR.indexOf(curD)), visible,
+    base:$('#base').value, opacity:+$('#opacity').value,
     photos:JSON.parse(JSON.stringify(photos)), nextNo:+$('#nextNo').value,
     strokes:JSON.parse(JSON.stringify(strokes)), locked, bearing:map.getBearing(),
     updated:Date.now()};
@@ -2138,8 +2309,9 @@ $('#fileSite').onchange=e=>{
   r.onload=()=>{
     let rec;
     try{ rec=JSON.parse(r.result); }catch(_){ toast('この形式のファイルは読み込めません'); return; }
-    if(!rec||!rec.planSrc||!rec.st){ toast('現場ファイルではないようです'); return; }
-    applySite(rec,rec.planSrc);
+    const ok = rec && ((Array.isArray(rec.drawings) && rec.drawings.length && rec.drawings.every(x=>x.planSrc&&x.st)) || (rec.planSrc && rec.st));
+    if(!ok){ toast('現場ファイルではないようです'); return; }
+    applySite(rec);
   };
   r.onerror=()=>toast('ファイルを読み込めませんでした');
   r.readAsText(f);
@@ -2197,9 +2369,10 @@ if(btnClr) btnClr.onclick=()=>{
 };
 
 /* 動作確認用フック */
-window.__ov = { map, pxToLL, llToPx, planUpBearing, get ST(){return ST}, get IMG(){return IMG}, get photos(){return photos} };
+window.__ov = { map, pxToLL, llToPx, planUpBearing, get ST(){return ST}, get IMG(){return IMG}, get photos(){return photos}, get DR(){return DR}, get cur(){return curD}, selectDrawing };
 
 /* 初期メッセージ */
+renderDrawList();
 setTimeout(()=>{ if(!ST) { $('#panel').classList.add('open'); } },600);
 })();
 </script>
