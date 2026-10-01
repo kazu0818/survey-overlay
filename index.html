@@ -961,7 +961,7 @@ body.adjust.multi #adjSel{display:flex}
 
 <div id="adjSel">調整する図面 <select id="adjSelect"></select></div>
 
-<div id="guide"><span id="guideText"></span><button id="guideCancel">中止</button></div>
+<div id="guide"><span id="guideText"></span><button id="guideBack" style="display:none">1つ戻す</button><button id="guideCancel">中止</button></div>
 
 <div id="dock">
   <label>透過</label>
@@ -1032,7 +1032,7 @@ body.adjust.multi #adjSel{display:flex}
     <h3>位置合わせ</h3>
     <p class="lockNote">図面は固定中です。調整するには上部の「固定中」を押して解除してください。</p>
     <button class="primary" style="width:100%" id="btnTwoPoint">2点合わせを開始（推奨）</button>
-    <p class="hint">図面上の目印（交差点・建物角など）と、地図上の同じ場所を2組タップすると、縮尺・回転・位置が自動で合います。</p>
+    <p class="hint">図面上の目印（交差点・建物角など）と、地図上の同じ場所を2組タップすると、縮尺・回転・位置が自動で合います。点を選んでいる間もピンチ（PCはホイール）で拡大・縮小、ドラッグで移動できるので、拡大してから正確にタップしてください。間違えたら「1つ戻す」。</p>
     <div class="row"><label>回転</label><input type="range" id="rot" min="-180" max="180" step="0.1" value="0"><span class="val" id="rotVal">0.0°</span></div>
     <div class="grid3" style="margin-bottom:8px">
       <button data-rot="-1">−1°</button><button data-rot="-0.1">−0.1°</button><button data-rot="0" id="rotZero">0°</button>
@@ -1458,7 +1458,9 @@ function setMode(m){
   document.body.classList.toggle('adjust',m==='adjust');
   document.body.classList.toggle('photomode',m==='photo');
   document.body.classList.toggle('drawmode',m==='draw');
-  $('#capture').classList.toggle('on', m==='adjust'||m==='pick'||m==='photo'||m==='draw');
+  $('#capture').classList.toggle('on', m==='adjust'||m==='photo'||m==='draw');
+  /* 2点合わせ中はダブルタップ拡大を止める（2回のタップが2点として入ってしまうため） */
+  if(m==='pick') map.doubleClickZoom.disable(); else map.doubleClickZoom.enable();
   updateFrame();
 }
 $('#adjSelect').onchange=e=>{ const d=DR.find(x=>x.id===e.target.value); if(d) selectDrawing(d); };
@@ -1566,9 +1568,20 @@ $('#btnTwoPoint').onclick=()=>{
   clearMarkers();
   setMode('pick');
   showGuide(PICK_MSG[0]);
+  toast('ピンチ（PCはホイール）で拡大・縮小、ドラッグで移動しながら点を選べます');
 };
-function handlePick(p){
-  const ll=toLatLng(p);
+/* 2点合わせ：指を動かさずに軽くタップした所だけを点として受け付ける（ドラッグ・ピンチは地図の移動・拡大になる） */
+map.on('click',e=>{ if(mode==='pick' && pick) handlePick(null,e.latlng); });
+/* 1つ前の点に戻る */
+function undoPick(){
+  if(!pick || pick.step===0) return;
+  pick.step--;
+  const k=['p1','q1','p2','q2'][pick.step]; pick[k]=null;
+  const m=markers.pop(); if(m) map.removeLayer(m);
+  showGuide(PICK_MSG[pick.step]);
+}
+function handlePick(p,llGiven){
+  const ll=llGiven||toLatLng(p);
   if(pick.step===0){ pick.p1=llToPx(ll); addMarker(ll,'a'); }
   else if(pick.step===1){ pick.q1=ll; addMarker(ll,'a'); }
   else if(pick.step===2){ pick.p2=llToPx(ll); addMarker(ll,'b'); }
@@ -1595,7 +1608,8 @@ function solveTwoPoint(){
 }
 function cancelPick(){ if(pick){pick=null; clearMarkers(); hideGuide();} }
 $('#guideCancel').onclick=()=>{ cancelPick(); setMode('map'); };
-function showGuide(t){ $('#guideText').textContent=t; $('#guide').classList.add('on'); }
+$('#guideBack').onclick=undoPick;
+function showGuide(t){ $('#guideText').textContent=t; $('#guide').classList.add('on'); $('#guideBack').style.display=(pick&&pick.step>0)?'':'none'; }
 function hideGuide(){ $('#guide').classList.remove('on'); }
 
 /* ============ スライダー類 ============ */
