@@ -744,6 +744,23 @@ body.adjust #capture{background:rgba(31,111,208,.04)}
   box-shadow:var(--shadow);display:none;align-items:center;gap:12px;max-width:92vw}
 #guide.on{display:flex}
 #guide button{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.4);color:#fff;padding:6px 10px;min-height:0}
+#guide #guideDone{background:#fff;color:var(--accent);font-weight:700}
+/* 位置合わせの点（図面側＝赤枠、地図側＝青塗り）と残差一覧 */
+.pk{width:26px;height:26px;border-radius:50%;font:700 12px/22px -apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.pk-img{background:#fff;color:#c0392b;border:3px solid #c0392b}
+.pk-map{background:#1f6fd0;color:#fff;border:3px solid #fff}
+#fitCard{display:none;position:absolute;left:12px;top:160px;z-index:1245;width:236px;max-height:46vh;overflow:auto;
+  background:rgba(255,255,255,.97);border:2px solid var(--accent);border-radius:12px;padding:10px 12px;box-shadow:var(--shadow);font-size:13px}
+#fitCard.on{display:block}
+#fitCard .fh{font-size:12.5px;font-weight:600;margin-bottom:6px;line-height:1.5}
+#fitCard .fh b{font-size:16px;color:var(--accent)}
+#fitCard .fr{display:flex;align-items:center;gap:8px;padding:4px 0;border-top:1px solid var(--line)}
+#fitCard .fr .no{font-weight:700;min-width:44px}
+#fitCard .fr .rv{flex:1;font-variant-numeric:tabular-nums}
+#fitCard .fr.bad .rv{color:var(--warn);font-weight:700}
+#fitCard .fr button{min-height:28px;padding:3px 9px;font-size:12px}
+#fitCard .fnote{font-size:11px;color:var(--sub);line-height:1.5;margin:6px 0 0}
+@media (max-width:640px){#fitCard{top:auto;bottom:150px;width:auto;right:12px;max-height:30vh}}
 
 /* ---- 十字 ---- */
 #cross{position:absolute;inset:0;z-index:900;pointer-events:none;display:none}
@@ -961,7 +978,8 @@ body.adjust.multi #adjSel{display:flex}
 
 <div id="adjSel">調整する図面 <select id="adjSelect"></select></div>
 
-<div id="guide"><span id="guideText"></span><button id="guideBack" style="display:none">1つ戻す</button><button id="guideCancel">中止</button></div>
+<div id="guide"><span id="guideText"></span><button id="guideBack" style="display:none">1つ戻す</button><button id="guideDone" style="display:none">完了</button><button id="guideCancel">中止</button></div>
+<div id="fitCard"></div>
 
 <div id="dock">
   <label>透過</label>
@@ -1031,8 +1049,8 @@ body.adjust.multi #adjSel{display:flex}
   <div class="sec">
     <h3>位置合わせ</h3>
     <p class="lockNote">図面は固定中です。調整するには上部の「固定中」を押して解除してください。</p>
-    <button class="primary" style="width:100%" id="btnTwoPoint">2点合わせを開始（推奨）</button>
-    <p class="hint">図面上の目印（交差点・建物角など）と、地図上の同じ場所を2組タップすると、縮尺・回転・位置が自動で合います。点を選んでいる間もピンチ（PCはホイール）で拡大・縮小、ドラッグで移動できるので、拡大してから正確にタップしてください。間違えたら「1つ戻す」。</p>
+    <button class="primary" style="width:100%" id="btnTwoPoint">位置合わせを開始（3点以上推奨）</button>
+    <p class="hint">図面上の目印（交差点・建物角・尾根や谷の形など）→ 地図上の同じ場所、の順にタップして1組。これを何組でも打てます。2組で図面が合い、3組目からは最小二乗で計算し直して、点ごとのずれと平均のずれ（RMS）を表示します。ずれの大きい点は「外す」で除けます。点を選んでいる間もピンチ（PCはホイール）で拡大・縮小、ドラッグで移動できます。</p>
     <div class="row"><label>回転</label><input type="range" id="rot" min="-180" max="180" step="0.1" value="0"><span class="val" id="rotVal">0.0°</span></div>
     <div class="grid3" style="margin-bottom:8px">
       <button data-rot="-1">−1°</button><button data-rot="-0.1">−0.1°</button><button data-rot="0" id="rotZero">0°</button>
@@ -1401,7 +1419,7 @@ function loadImageFile(f){ return new Promise(done=>{
     if(!visible) setImgVisible(true);
     selectDrawing(d,true);
     if($('#siteName').textContent==='図面未読込') $('#siteName').textContent = name;
-    toast(DR.length>1 ? `「${name}」を追加しました（${DR.length}枚目）。「2点合わせ」で位置を合わせてください` : '図面を読み込みました。「2点合わせ」で位置を合わせてください');
+    toast(DR.length>1 ? `「${name}」を追加しました（${DR.length}枚目）。「位置合わせ」で位置を合わせてください` : '図面を読み込みました。「位置合わせ」で位置を合わせてください');
     setLock(false);
     setMode('adjust');
     done();
@@ -1548,68 +1566,137 @@ function applyGesture(){
   }
 }
 
-/* ============ 2点合わせ ============ */
-let pick=null;
-const PICK_MSG=[
-  '① 図面上の目印を1点タップ',
-  '② その目印にあたる地図上の場所をタップ',
-  '③ 図面上のもう1点をタップ（1点目から離れた場所）',
-  '④ その2点目にあたる地図上の場所をタップ'
-];
-let markers=[];
+/* ============ 位置合わせ（何点でも：最小二乗のヘルマート変換） ============
+   図面上の目印 → 地図上の同じ場所、を1組として何組でも打てる。2組からその場で図面を合わせ、組を足すたびに最小二乗で計算し直す。
+   変換は移動・回転・縮尺（縦横同じ倍率）の4つ。CADから書き出した図面ならこの形で正しい。
+   残差（各点で、合わせた図面の目印と地図上の点が何mずれているか）を一覧に出し、ずれの大きい点は外して計算し直せる。 */
+let pick=null;      // {pairs:[{px:{x,y}, ll}], pending:{x,y}|null, st0, mk:[]}
+let markers=[];     // 互換用（他の処理から clearMarkers が呼ばれる）
 function clearMarkers(){ markers.forEach(m=>map.removeLayer(m)); markers=[]; }
-function addMarker(ll,cls){ const m=L.marker(ll,{icon:L.divIcon({className:'',html:`<div class="pin ${cls}"></div>`,iconSize:[16,16],iconAnchor:[8,8]})}).addTo(map); markers.push(m); }
+function pkIcon(n,kind){ return L.divIcon({className:'', iconSize:[26,26], iconAnchor:[13,13], html:`<div class="pk pk-${kind}">${n}</div>`}); }
+function pickMsg(){
+  if(!pick) return '';
+  const k=pick.pairs.length+1;
+  return pick.pending ? `No.${k}：その目印にあたる地図上の場所をタップ` : `No.${k}：図面上の目印をタップ` + (pick.pairs.length>=2 ? '（または「完了」）' : '');
+}
+/* 最小二乗（閉じた式）。図面座標 U=px−w/2, V=−(py−h/2) → 地図座標（基準点からの東西E・南北N, m） */
+function fitPairs(pairs){
+  const ref=pairs[0].ll;
+  const P=pairs.map(q=>{ const d=deltaEN(ref,q.ll); return {U:q.px.x-IMG.w/2, V:-(q.px.y-IMG.h/2), E:d.E, N:d.N}; });
+  const n=P.length, mU=P.reduce((t,q)=>t+q.U,0)/n, mV=P.reduce((t,q)=>t+q.V,0)/n, mE=P.reduce((t,q)=>t+q.E,0)/n, mN=P.reduce((t,q)=>t+q.N,0)/n;
+  let suu=0, sa=0, sb=0;
+  P.forEach(q=>{ const u=q.U-mU, v=q.V-mV, e=q.E-mE, nn=q.N-mN; suu+=u*u+v*v; sa+=u*e+v*nn; sb+=u*nn-v*e; });
+  if(suu<25) return null;                               // 図面上の点がほぼ1か所に集まっている
+  const A=sa/suu, B=sb/suu, mpp=Math.hypot(A,B);
+  if(!(mpp>0)) return null;
+  const Ec=mE-(A*mU-B*mV), Nc=mN-(B*mU+A*mV);
+  const c=offsetLL(ref.lat,ref.lng,Ec,Nc);
+  const res=P.map(q=>Math.hypot(A*q.U-B*q.V+Ec-q.E, B*q.U+A*q.V+Nc-q.N));
+  const rms=Math.sqrt(res.reduce((t,r)=>t+r*r,0)/n);
+  /* 地図上の点の広がり（狭いと回転・縮尺の誤差が大きくなる） */
+  const spread=Math.sqrt(P.reduce((t,q)=>t+(q.E-mE)**2+(q.N-mN)**2,0)/n);
+  return {st:{lat:c.lat,lng:c.lng,mpp,rot:Math.atan2(B,A)/D2R}, res, rms, spread};
+}
+function applyFit(){
+  if(!pick) return;
+  pick.fit=null;
+  if(pick.pairs.length>=2){
+    const f=fitPairs(pick.pairs);
+    if(f){ Object.assign(ST,f.st); pick.fit=f; }
+  }else{
+    Object.assign(ST,pick.st0);
+  }
+  refresh(); drawPickMarks(); renderFitCard();
+}
+function drawPickMarks(){
+  pick.mk.forEach(m=>map.removeLayer(m)); pick.mk=[];
+  const add=l=>{ l.addTo(map); pick.mk.push(l); };
+  pick.pairs.forEach((q,i)=>{
+    const a=pxToLL(q.px.x,q.px.y);
+    add(L.polyline([a,q.ll],{color:'#c2410c',weight:2,dashArray:'4 4',interactive:false}));
+    add(L.marker(a,{icon:pkIcon(i+1,'img'),interactive:false,zIndexOffset:950}));
+    add(L.marker(q.ll,{icon:pkIcon(i+1,'map'),interactive:false,zIndexOffset:960}));
+  });
+  if(pick.pending) add(L.marker(pxToLL(pick.pending.x,pick.pending.y),{icon:pkIcon(pick.pairs.length+1,'img'),interactive:false,zIndexOffset:970}));
+}
+const fmtM=m=>m<10?m.toFixed(2)+' m':m.toFixed(1)+' m';
+function renderFitCard(){
+  const card=$('#fitCard'); if(!card) return;
+  if(!pick || !pick.pairs.length){ card.classList.remove('on'); return; }
+  card.classList.add('on');
+  const f=pick.fit, n=pick.pairs.length;
+  let head;
+  if(n<2) head='あと1組で図面が合います';
+  else if(!f) head='図面上の点が近すぎます。離れた所を選んでください';
+  else if(n===2) head='2組では誤差を確かめられません。3組以上をおすすめします';
+  else head=`平均のずれ（RMS） <b>${fmtM(f.rms)}</b>　/ ${n}組`;
+  const worst = f && n>=3 ? f.res.indexOf(Math.max(...f.res)) : -1;
+  const rows=pick.pairs.map((q,i)=>{
+    const r = f && n>=3 ? fmtM(f.res[i]) : '—';
+    return `<div class="fr${i===worst&&f.res[i]>2*f.rms&&f.res[i]>0.3?' bad':''}"><span class="no">No.${i+1}</span><span class="rv">${r}</span><button data-drop="${i}">外す</button></div>`;
+  }).join('');
+  const note = f && n>=2 && f.spread<20 ? '<p class="fnote">点どうしが近いと回転・縮尺の誤差が大きくなります。できるだけ図面の端どうしなど離れた所を選んでください。</p>' : '';
+  card.innerHTML=`<div class="fh">${head}</div>${rows}${note}<p class="fnote">ずれ＝合わせた図面上の目印と、地図上でタップした点との距離。点の打ち方のばらつきの目安で、地図そのものの誤差は含みません。</p>`;
+  card.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{ pick.pairs.splice(+b.dataset.drop,1); applyFit(); showGuide(pickMsg()); });
+}
 
 $('#btnTwoPoint').onclick=()=>{
   if(!ST){toast('先に図面を読み込んでください');return;}
   if(lockedMsg()) return;
   closePanel();
-  pick={step:0, p1:null, q1:null, p2:null, q2:null};
   clearMarkers();
+  pick={pairs:[], pending:null, st0:{...ST}, mk:[], fit:null};
   setMode('pick');
-  showGuide(PICK_MSG[0]);
-  toast('ピンチ（PCはホイール）で拡大・縮小、ドラッグで移動しながら点を選べます');
+  showGuide(pickMsg()); renderFitCard();
+  toast('図面上の目印→地図上の同じ場所、の順に何組でもタップできます。ピンチ（PCはホイール）で拡大・縮小、ドラッグで移動できます');
 };
-/* 2点合わせ：指を動かさずに軽くタップした所だけを点として受け付ける（ドラッグ・ピンチは地図の移動・拡大になる） */
+/* 指を動かさずに軽くタップした所だけを点として受け付ける（ドラッグ・ピンチは地図の移動・拡大になる） */
 map.on('click',e=>{ if(mode==='pick' && pick) handlePick(null,e.latlng); });
-/* 1つ前の点に戻る */
-function undoPick(){
-  if(!pick || pick.step===0) return;
-  pick.step--;
-  const k=['p1','q1','p2','q2'][pick.step]; pick[k]=null;
-  const m=markers.pop(); if(m) map.removeLayer(m);
-  showGuide(PICK_MSG[pick.step]);
-}
 function handlePick(p,llGiven){
   const ll=llGiven||toLatLng(p);
-  if(pick.step===0){ pick.p1=llToPx(ll); addMarker(ll,'a'); }
-  else if(pick.step===1){ pick.q1=ll; addMarker(ll,'a'); }
-  else if(pick.step===2){ pick.p2=llToPx(ll); addMarker(ll,'b'); }
-  else if(pick.step===3){ pick.q2=ll; addMarker(ll,'b'); solveTwoPoint(); return; }
-  pick.step++;
-  showGuide(PICK_MSG[pick.step]);
+  if(!pick.pending){
+    const px=llToPx(ll);
+    if(px.x<0||px.y<0||px.x>IMG.w||px.y>IMG.h){ toast('図面の外です。図面の上の目印をタップしてください'); return; }
+    pick.pending=px;
+  }else{
+    pick.pairs.push({px:pick.pending, ll});
+    pick.pending=null;
+    applyFit();
+    if(pick.pairs.length===2 && !pick.fit) toast('図面上の2点が近すぎます。もっと離れた所を選んでください');
+  }
+  drawPickMarks(); renderFitCard();
+  showGuide(pickMsg());
 }
-function solveTwoPoint(){
-  const {p1,q1,p2,q2}=pick;
-  const du=(p2.x-p1.x), dv=-(p2.y-p1.y);
-  const lenI=Math.hypot(du,dv);
-  const dq=deltaEN(q1,q2);
-  const lenM=Math.hypot(dq.E,dq.N);
-  if(lenI<5 || lenM<0.5){ toast('2点が近すぎます。もう一度やり直してください'); cancelPick(); return; }
-  const s = lenM/lenI;   // 図面1ピクセルあたりの実距離(m)
-  const th = Math.atan2(dq.N,dq.E) - Math.atan2(dv,du);
-  ST.mpp = s;
-  ST.rot = th/D2R;
-  anchor(p1.x,p1.y,q1);
-  refresh();
-  hideGuide(); setMode('map'); pick=null;
-  setTimeout(clearMarkers,2500);
-  toast('位置合わせが完了しました。ずれないよう上部の「図面固定」で固定できます');
+/* 1つ前に戻す */
+function undoPick(){
+  if(!pick) return;
+  if(pick.pending) pick.pending=null;
+  else if(pick.pairs.length){ const q=pick.pairs.pop(); pick.pending=q.px; applyFit(); }
+  drawPickMarks(); renderFitCard(); showGuide(pickMsg());
 }
-function cancelPick(){ if(pick){pick=null; clearMarkers(); hideGuide();} }
+function finishPick(){
+  if(!pick) return;
+  if(pick.pairs.length<2 || !pick.fit){ toast('2組以上（おすすめは3組以上）打ってから「完了」を押してください'); return; }
+  const f=pick.fit, n=pick.pairs.length;
+  const mk=pick.mk; pick.mk=[];
+  pick=null; hideGuide(); $('#fitCard').classList.remove('on'); setMode('map');
+  setTimeout(()=>mk.forEach(m=>map.removeLayer(m)),3000);
+  toast(n>=3 ? `位置合わせが完了しました（${n}組・平均のずれ ${fmtM(f.rms)}）。「図面固定」で固定できます` : '位置合わせが完了しました（2組）。「図面固定」で固定できます');
+}
+function cancelPick(){
+  if(!pick) return;
+  Object.assign(ST,pick.st0); refresh();
+  pick.mk.forEach(m=>map.removeLayer(m));
+  pick=null; hideGuide(); $('#fitCard').classList.remove('on');
+}
 $('#guideCancel').onclick=()=>{ cancelPick(); setMode('map'); };
 $('#guideBack').onclick=undoPick;
-function showGuide(t){ $('#guideText').textContent=t; $('#guide').classList.add('on'); $('#guideBack').style.display=(pick&&pick.step>0)?'':'none'; }
+$('#guideDone').onclick=finishPick;
+function showGuide(t){
+  $('#guideText').textContent=t; $('#guide').classList.add('on');
+  $('#guideBack').style.display=(pick&&(pick.pending||pick.pairs.length))?'':'none';
+  $('#guideDone').style.display=(pick&&pick.pairs.length>=2&&!pick.pending)?'':'none';
+}
 function hideGuide(){ $('#guide').classList.remove('on'); }
 
 /* ============ スライダー類 ============ */
